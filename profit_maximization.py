@@ -1,4 +1,4 @@
-import random, time, pulp, matplotlib, math
+import random, time, pulp, matplotlib, math, copy
 import networkx as nx
 import numpy as np
 from pprint import pprint
@@ -42,24 +42,25 @@ def generate_instance():
 
 		all_requests[i]['detour_sensitivity_normalized'] = random.randint(1,MAX_SENSITIVITY)*1.0/ALPHA_OP
 
-		all_requests[i]['prices_per_unit_dist'] = {}
+		all_requests[i]['our_cut_from_requester'] = {}
 		n = sorted(random.sample(range(1,MAX_BETA),MAX_NO_BETAS))
 		#print n
 		for k in range(1,MAX_NO_BETAS+1):
-			all_requests[i]['prices_per_unit_dist'][k] = n[k-1]*1.0/MAX_BETA #k-1 because n is indexed from 0 instead of 1
+			all_requests[i]['our_cut_from_requester'][k] = n[k-1]*1.0/MAX_BETA #k-1 because n is indexed from 0 instead of 1
 
 	return {'all_requests': all_requests,
 	'params':{
 	'OUR_CUT_FROM_DRIVER': OUR_CUT_FROM_DRIVER,
 	'NO_OF_REQUESTS_WO_SIR': NO_OF_REQUESTS_WO_SIR,
 	'MAX_PERCENT_EXTRA_REQUESTS':MAX_PERCENT_EXTRA_REQUESTS,
-	'GAMMA': GAMMA}}
+	'GAMMA': GAMMA,
+	'ALPHA_OP':ALPHA_OP}}
 
 def euclidean(x,y):
 	assert x is not None and y is not None
 	return np.linalg.norm(x - y)
 
-def get_driving_distance(selected_requests,permutation,instance):
+def get_driving_distance(selected_requests,permutation,all_permutations,instance):
 
 	#local
 	all_requests = instance['all_requests'] #TODO
@@ -94,7 +95,7 @@ def get_driving_distance(selected_requests,permutation,instance):
 			print "Error!" #TODO
 			return -1 #TODO
 
-def check_SIR_satisfaction(selected_requests,permutation,instance,all_permutations):
+def check_SIR_satisfaction_general(selected_requests,permutation,instance,all_permutations):
 	
 	all_requests = instance['all_requests'] #TODO
 	params = instance['params']
@@ -116,12 +117,12 @@ def check_SIR_satisfaction(selected_requests,permutation,instance,all_permutatio
 
 		if all_permutations[permutation] == 'case1':
 
-			constraint_i =  (all_requests[i]['prices_per_unit_dist'][1] - all_requests[i]['prices_per_unit_dist'][2])*euclidean(all_requests[i]['orig'],all_requests[i]['dest']) \
+			constraint_i =  (all_requests[i]['our_cut_from_requester'][1] - all_requests[i]['our_cut_from_requester'][2])*euclidean(all_requests[i]['orig'],all_requests[i]['dest']) \
 				>= (params['GAMMA'] + all_requests[i]['detour_sensitivity_normalized'])*\
 					(euclidean(all_requests[i]['orig'],all_requests[j]['orig']) + \
 					euclidean(all_requests[j]['orig'],all_requests[i]['dest']) - \
 					euclidean(all_requests[i]['orig'],all_requests[i]['dest']))
-			constraint_j = (all_requests[j]['prices_per_unit_dist'][1] - all_requests[j]['prices_per_unit_dist'][2])*euclidean(all_requests[j]['orig'],all_requests[j]['dest']) \
+			constraint_j = (all_requests[j]['our_cut_from_requester'][1] - all_requests[j]['our_cut_from_requester'][2])*euclidean(all_requests[j]['orig'],all_requests[j]['dest']) \
 				>= (params['GAMMA'] + all_requests[j]['detour_sensitivity_normalized'])*\
 					(euclidean(all_requests[j]['orig'],all_requests[i]['dest']) + \
 					euclidean(all_requests[i]['dest'],all_requests[j]['dest']) - \
@@ -129,13 +130,13 @@ def check_SIR_satisfaction(selected_requests,permutation,instance,all_permutatio
 
 		elif all_permutations[permutation] == 'case2':
 
-			constraint_i = (all_requests[i]['prices_per_unit_dist'][1] - all_requests[i]['prices_per_unit_dist'][2])*euclidean(all_requests[i]['orig'],all_requests[i]['dest']) \
+			constraint_i = (all_requests[i]['our_cut_from_requester'][1] - all_requests[i]['our_cut_from_requester'][2])*euclidean(all_requests[i]['orig'],all_requests[i]['dest']) \
 				>= (params['GAMMA'] + all_requests[i]['detour_sensitivity_normalized'])*\
 					(euclidean(all_requests[i]['orig'],all_requests[j]['orig']) + \
 					euclidean(all_requests[j]['orig'],all_requests[j]['dest']) + \
 					euclidean(all_requests[j]['dest'],all_requests[i]['dest']) - \
 					euclidean(all_requests[i]['orig'],all_requests[i]['dest']))
-			constraint_j = all_requests[j]['prices_per_unit_dist'][1] >= all_requests[j]['prices_per_unit_dist'][2]
+			constraint_j = all_requests[j]['our_cut_from_requester'][1] >= all_requests[j]['our_cut_from_requester'][2]
 
 		else:
 			print "Error!" #TODO
@@ -143,6 +144,45 @@ def check_SIR_satisfaction(selected_requests,permutation,instance,all_permutatio
 			constraint_j = False
 
 		return constraint_i and constraint_j
+
+
+
+def check_SIR_satisfaction_detour_based(selected_requests,permutation,instance,all_permutations):
+	
+	all_requests = instance['all_requests'] #TODO
+	params = instance['params']
+
+	#Logic
+	if len(selected_requests) > 2:
+		return NotImplementedError
+
+	if len(selected_requests) == 1: #redundant
+		return True
+
+	if len(selected_requests) == 2:
+
+		i = selected_requests[0]
+		j = selected_requests[1]
+
+		if permutation[0]=='sj':#i and j are symmetric within each case. See board photo. TODO
+			(i,j) = (j,i)		
+
+		constraint_i = all_requests[i]['our_cut_from_requester'][1]\
+				>= params['GAMMA'] + all_requests[i]['detour_sensitivity_normalized']
+		constraint_j = all_requests[j]['our_cut_from_requester'][1]\
+				>= params['GAMMA'] + all_requests[j]['detour_sensitivity_normalized']
+
+		if all_permutations[permutation] == 'case1':
+
+			return constraint_i and constraint_j
+
+		elif all_permutations[permutation] == 'case2':
+
+			return constraint_i
+
+		else:
+			print "Error!" #TODO
+			return False
 
 
 def get_profit(selected_requests,instance):
@@ -153,12 +193,17 @@ def get_profit(selected_requests,instance):
 	all_requests = instance['all_requests']
 	params = instance['params']
 
+	if params['EXP_DISCOUNT_SETTING'] == 'detour_based':
+		check_SIR_routine = check_SIR_satisfaction_detour_based
+	elif params['EXP_DISCOUNT_SETTING'] == 'independent':
+		check_SIR_routine = check_SIR_satisfaction_general
+
 	#Logic
 	if len(selected_requests) > 2:
 		return NotImplementedError
 
 	if len(selected_requests) == 1:
-		return [all_requests[selected_requests[0]]['prices_per_unit_dist'][1]*euclidean(all_requests[selected_requests[0]]['orig'],all_requests[selected_requests[0]]['dest']),('si','di')]
+		return [all_requests[selected_requests[0]]['our_cut_from_requester'][1]*euclidean(all_requests[selected_requests[0]]['orig'],all_requests[selected_requests[0]]['dest']),('si','di')]
 
 	if len(selected_requests) == 2:
 		i = selected_requests[0]
@@ -173,9 +218,9 @@ def get_profit(selected_requests,instance):
 		max_profit = 0
 		max_profit_permutation = None
 		for k,permutation in enumerate(all_permutations):
-			SIR_satisfied = check_SIR_satisfaction([i,j],permutation,instance, all_permutations)
+			SIR_satisfied = check_SIR_routine([i,j],permutation,instance, all_permutations)
 			if SIR_satisfied is True:
-				profits[k] = params['ALPHA_OP']*(sum([all_requests[m]['prices_per_unit_dist'][2]*euclidean(all_requests[m]['orig'],all_requests[m]['dest']) for m in (i,j)]) - (1-params['OUR_CUT_FROM_DRIVER'])*get_driving_distance([i,j],permutation,instance))
+				profits[k] = params['ALPHA_OP']*(sum([all_requests[m]['our_cut_from_requester'][2]*euclidean(all_requests[m]['orig'],all_requests[m]['dest']) for m in (i,j)]) - (1-params['OUR_CUT_FROM_DRIVER'])*get_driving_distance([i,j],permutation,all_permutations,instance))
 			if profits[k] > max_profit:
 				max_profit_permutation = copy.deepcopy(permutation)
 				max_profit = profits[k]
@@ -202,6 +247,9 @@ def get_incremental_profit(selected_requests,instance):
 instance = generate_instance()
 all_requests = instance['all_requests'] #local pointer I think
 
+#Not instance specific parameters, prepend with EXP_xxxx
+instance['params']['EXP_DISCOUNT_SETTING'] = 'detour_based'
+# instance['param']['EXP_DISCOUNT_SETTING'] = 'independent'
 
 #pprint(requests)
 H = nx.Graph()
