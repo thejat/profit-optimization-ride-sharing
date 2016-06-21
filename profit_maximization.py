@@ -13,47 +13,64 @@ __author__ = 'q4fj4lj9'
 
 def generate_instance():
 
-	NO_OF_REQUESTS_WO_SIR = 4
-	MAX_PERCENT_EXTRA_REQUESTS = 100
+	#requests and service provider details
 
-	GRID_MAX   = 10
+	NO_OF_REQUESTS_IN_UNIVERSE = 20
+	INITIAL_MARKET_SHARE_OF_SERVICE_PROVIDER = .6
+	INITIAL_RIDE_SHARING_AMONG_SERVICE_PROVIDER = .3
+	BETA1 = 0.9
+	BETA2 = 0.8 #dummy for detour based discounting setting.
+
+	GRID_MAX   = 100
 	GRID_MAX_X = GRID_MAX
 	GRID_MAX_Y = GRID_MAX
 
-	MAX_NO_BETAS  = 2
-	MAX_BETA = 1000
 	MAX_SENSITIVITY = 1000
 
 	OUR_CUT_FROM_DRIVER = 0.3
-	GAMMA = 0
 	ALPHA_OP = MAX_SENSITIVITY/2
 
-
 	all_requests = OrderedDict()
-	for i in range(int(NO_OF_REQUESTS_WO_SIR*(1+ 0.01*MAX_PERCENT_EXTRA_REQUESTS))):
+	for i in range(NO_OF_REQUESTS_IN_UNIVERSE):
 		all_requests[i] = OrderedDict()
+
+
 		all_requests[i]['orig'] = (0,0)
 		all_requests[i]['dest'] = (0,0)
-		if all_requests[i]['orig']==all_requests[i]['dest']:
+		while all_requests[i]['orig'][0]==all_requests[i]['dest'][0] and all_requests[i]['orig'][1]==all_requests[i]['dest'][1]:
 			all_requests[i]['orig'] = np.array([random.randint(0,GRID_MAX_X),random.randint(0,GRID_MAX_Y)])
 			all_requests[i]['dest'] = np.array([random.randint(0,GRID_MAX_X),random.randint(0,GRID_MAX_Y)])
 
 		all_requests[i]['detour_sensitivity'] = random.randint(1,MAX_SENSITIVITY)
 
-		all_requests[i]['detour_sensitivity_normalized'] = random.randint(1,MAX_SENSITIVITY)*1.0/ALPHA_OP
+		all_requests[i]['detour_sensitivity_normalized'] = all_requests[i]['detour_sensitivity']*1.0/ALPHA_OP
 
-		all_requests[i]['our_cut_from_requester'] = {}
-		n = sorted(random.sample(range(1,MAX_BETA),MAX_NO_BETAS))
-		#print n
-		for k in range(1,MAX_NO_BETAS+1):
-			all_requests[i]['our_cut_from_requester'][k] = n[k-1]*1.0/MAX_BETA #k-1 because n is indexed from 0 instead of 1
+		all_requests[i]['our_cut_from_requester'] = {1:BETA1,2:BETA2}
+
+	#Splitting the universe into service provider part and non service provider part
+
+	request_ids_initial_market_share = random.sample(all_requests.keys(),int(INITIAL_MARKET_SHARE_OF_SERVICE_PROVIDER*NO_OF_REQUESTS_IN_UNIVERSE))
+
+
+	for i in all_requests:
+		if i in request_ids_initial_market_share:
+			all_requests[i]['PROVIDER_MARKET'] = True
+		else:
+			all_requests[i]['PROVIDER_MARKET'] = False
+
+
+	#Splitting the requests in the service provider part further into ride share and non-ride share
+	request_ids_initial_ride_sharing = random.sample(request_ids_initial_market_share,int(INITIAL_RIDE_SHARING_AMONG_SERVICE_PROVIDER*len(request_ids_initial_market_share)))
+
+	for i in request_ids_initial_market_share:
+		if i in request_ids_initial_ride_sharing:
+			all_requests[i]['RIDE_SHARING'] = True
+		else:
+			all_requests[i]['RIDE_SHARING'] = False
 
 	return {'all_requests': all_requests,
 	'params':{
 	'OUR_CUT_FROM_DRIVER': OUR_CUT_FROM_DRIVER,
-	'NO_OF_REQUESTS_WO_SIR': NO_OF_REQUESTS_WO_SIR,
-	'MAX_PERCENT_EXTRA_REQUESTS':MAX_PERCENT_EXTRA_REQUESTS,
-	'GAMMA': GAMMA,
 	'ALPHA_OP':ALPHA_OP}}
 
 def euclidean(x,y):
@@ -145,8 +162,6 @@ def check_SIR_satisfaction_general(selected_requests,permutation,instance,all_pe
 
 		return constraint_i and constraint_j
 
-
-
 def check_SIR_satisfaction_detour_based(selected_requests,permutation,instance,all_permutations):
 	
 	all_requests = instance['all_requests'] #TODO
@@ -183,7 +198,6 @@ def check_SIR_satisfaction_detour_based(selected_requests,permutation,instance,a
 		else:
 			print "Error!" #TODO
 			return False
-
 
 def get_profit(selected_requests,instance):
 	assert instance is not None
@@ -227,7 +241,6 @@ def get_profit(selected_requests,instance):
 
 		return [max_profit,max_profit_permutation]
 
-
 def get_incremental_profit(selected_requests,instance):
 	'''
 	if incremental profit is less than or equal to zero then there is
@@ -244,27 +257,72 @@ def get_incremental_profit(selected_requests,instance):
 #######################################################
 #Two request case
 
-instance = generate_instance()
-all_requests = instance['all_requests'] #local pointer I think
+def get_experiment_params():
 
-#Not instance specific parameters, prepend with EXP_xxxx
-instance['params']['EXP_DISCOUNT_SETTING'] = 'detour_based'
-# instance['param']['EXP_DISCOUNT_SETTING'] = 'independent'
+	DISCOUNT_SETTING = 'detour_based' # 'independent'
+	SIR_SETTING = False
+	GAMMA = 0 #valid only when SIR_SETTING is True
 
-#pprint(requests)
-H = nx.Graph()
-optimal_permutation_per_pair = {} #optimal in terms of incremental profit subject to SIR
-for i in all_requests:
-	for j in all_requests:
-		if i != j:
-			[incremental_profit,optimal_permutation] = get_incremental_profit([i,j],instance)	
-			if  incremental_profit > 0:
-				H.add_edge(str(i), str(j), weight=incremental_profit)
-				optimal_permutation_per_pair[(i,j)] = optimal_permutation
-			else:
-				print "Pair {0},{1}  :   {2}".format(i,j,incremental_profit)
+	return {'DISCOUNT_SETTING':DISCOUNT_SETTING,
+	'SIR_SETTING':SIR_SETTING,
+	'GAMMA':GAMMA}
 
 
-#nx.Draw(H)
+def is_ridesharing(i,instance):
+	if instance['all_requests'][i]['PROVIDER_MARKET']==True:
+		if instance['all_requests'][i]['RIDE_SHARING']==True:
+			return True
+	return False
 
-#TODO: betas are not constants, but depend on detours. KEY
+def match_requests(instance,experiment_params):
+
+	H = nx.Graph()
+	request_pairs_with_permutations = {}
+	non_ridesharing_requests = []
+	for i in instance['all_requests']:
+		if is_ridesharing(i,instance) is False:
+			non_ridesharing_requests.append(i)
+			continue
+		for j in instance['all_requests']:
+			if i != j and is_ridesharing(j,instance) is True:
+				[incremental_profit,optimal_permutation] = get_incremental_profit([i,j],instance,experiment_params)	#TODO CHANGE FUNCTION
+				if  incremental_profit > 0:
+					H.add_edge(str(i), str(j), weight=incremental_profit)
+					request_pairs_with_permutations[(i,j)] = optimal_permutation
+					print "Include edge {0},{1}  :   {2}".format(i,j,incremental_profit)
+
+
+	mates = nx.max_weight_matching(H)
+	matched_request_pairs_with_permutations = {}
+	for i,j in mates.items():
+		if i < j:
+			matched_request_pairs_with_permutations[(i,j)] = request_pairs_with_permutations[(i,j)]
+	unmatched_requests = [x in H.nodes() if x not in mates.keys()]
+
+	return {'non_ridesharing_requests':non_ridesharing_requests,
+	'unmatched_requests':unmatched_requests,
+	'matched_request_pairs_with_permutations':matched_request_pairs_with_permutations}
+
+
+def get_profit_from_unmatched_requests(requests,instance):
+	return NotImplementedError
+
+def get_profit_from_non_ridesharing_requests(requests,instance):
+	return NotImplementedError
+
+def get_profit_from_matched_requests(matched_request_pairs_with_permutations,instance):
+	return NotImplementedError
+
+if '__init__'==__main__:
+
+	instance = generate_instance()
+	experiment_params = get_experiment_params()
+
+	[non_ridesharing_requests,unmatched_requests,matched_request_pairs_with_permutations] = match_requests(instance,experiment_params)
+
+	total_profit = \
+		get_profit_from_non_ridesharing_requests(non_ridesharing_requests,instance) + \
+		get_profit_from_unmatched_requests(unmatched_requests,instance) + \
+		get_profit_from_matched_requests(matched_request_pairs_with_permutations,instance)
+
+	print total_profit
