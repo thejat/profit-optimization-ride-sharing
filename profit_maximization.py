@@ -6,7 +6,7 @@ from collections import OrderedDict
 # import  matplotlib
 # matplotlib.use('Agg')
 # import matplotlib.pyplot as plt
-random.seed(1000)  # for replicability of experiments.
+# random.seed(1000)  # for replicability of experiments.
 __author__ = 'q4fj4lj9'
 
 
@@ -24,10 +24,21 @@ def generate_instance():
 	GRID_MAX_X = GRID_MAX
 	GRID_MAX_Y = GRID_MAX
 
-	MAX_SENSITIVITY = 1000
+	MAX_DETOUR_SENSITIVITY = 1000
 
 	OUR_CUT_FROM_DRIVER = 0.3
-	ALPHA_OP = MAX_SENSITIVITY/2
+	ALPHA_OP = MAX_DETOUR_SENSITIVITY/2
+
+	GAMMA_ARRAY = [0.5*x for x in range(0,5)]
+
+	PROB_PARAM_MARKET_SHARE = 300.0/ALPHA_OP
+
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA = 200
+
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL = 200
+
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL = 0.5*PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL
+
 
 	all_requests = OrderedDict()
 	for i in range(NO_OF_REQUESTS_IN_UNIVERSE):
@@ -40,33 +51,86 @@ def generate_instance():
 			all_requests[i]['orig'] = np.array([random.randint(0,GRID_MAX_X),random.randint(0,GRID_MAX_Y)])
 			all_requests[i]['dest'] = np.array([random.randint(0,GRID_MAX_X),random.randint(0,GRID_MAX_Y)])
 
-		all_requests[i]['detour_sensitivity'] = random.randint(1,MAX_SENSITIVITY)
+		all_requests[i]['detour_sensitivity'] = random.randint(1,MAX_DETOUR_SENSITIVITY)
 
 		all_requests[i]['detour_sensitivity_normalized'] = all_requests[i]['detour_sensitivity']*1.0/ALPHA_OP
 
 		all_requests[i]['our_cut_from_requester'] = {1:BETA1,2:BETA2}
 
+		#some default values
+		all_requests[i]['PROVIDER_MARKET'] = {gamma:False for gamma in GAMMA_ARRAY}
+		all_requests[i]['PROVIDER_MARKET']['no_gamma'] = False
+		
+		#RIDE_SHARING key will be a dictionary with gamma as keys
+		all_requests[i]['RIDE_SHARING'] = {gamma:False for gamma in GAMMA_ARRAY}
+		all_requests[i]['RIDE_SHARING']['no_gamma'] = False
+
 	#Splitting the universe into service provider part and non service provider part
-
-	request_ids_initial_market_share = random.sample(all_requests.keys(),int(INITIAL_MARKET_SHARE_OF_SERVICE_PROVIDER*NO_OF_REQUESTS_IN_UNIVERSE))
-
-
 	for i in all_requests:
-		if i in request_ids_initial_market_share:
-			all_requests[i]['PROVIDER_MARKET'] = True
-		else:
-			all_requests[i]['PROVIDER_MARKET'] = False
+		if random.uniform(0,1) < PROB_PARAM_MARKET_SHARE:
+			all_requests[i]['PROVIDER_MARKET']['no_gamma'] = True
+			for gamma in GAMMA_ARRAY:#redundant
+				all_requests[i]['PROVIDER_MARKET'][gamma] = True
 
 
-	#Splitting the requests in the service provider part further into ride share and non-ride share
-	request_ids_initial_ride_sharing = random.sample(request_ids_initial_market_share,int(INITIAL_RIDE_SHARING_AMONG_SERVICE_PROVIDER*len(request_ids_initial_market_share)))
+	#No SIR ridesharers in provider's market
+	for i in all_requests:
+		prob_threshold = PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA*\
+			(1-all_requests[i]['our_cut_from_requester'][1])/ \
+			all_requests[i]['detour_sensitivity']
+		if all_requests[i]['PROVIDER_MARKET']['no_gamma'] == True:
+			all_requests[i]['RIDE_SHARING']['no_gamma'] = (random.uniform(0,1) < prob_threshold)
 
-	for i in request_ids_initial_market_share:
-		if i in request_ids_initial_ride_sharing:
-			all_requests[i]['RIDE_SHARING'] = True
-		else:
-			all_requests[i]['RIDE_SHARING'] = False
 
+	#Intoducing SIR as a function of gamma: Now, both internal (in provier_market) and external (not in provider market) requests
+
+
+	previous_gamma = None
+	for idx,current_gamma in enumerate(GAMMA_ARRAY):
+
+		for i in all_requests:
+
+			# print "idx: {0}, i = {1}".format(idx,i)
+
+			prob_threshold = (1.0/(1+GAMMA_ARRAY[-1]))*\
+				(1-all_requests[i]['our_cut_from_requester'][1])* \
+				(1+current_gamma)/\
+				all_requests[i]['detour_sensitivity']
+
+			#Splitting the requests in the service provider part further into ride share and non-ride share
+			if all_requests[i]['PROVIDER_MARKET']['no_gamma'] == True:
+
+				if all_requests[i]['RIDE_SHARING']['no_gamma'] == False: #if they are not already ridesharing
+
+					prob_threshold *= PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL
+	
+					if idx == 0:
+						all_requests[i]['RIDE_SHARING'][current_gamma] = (random.uniform(0,1) < prob_threshold)
+					elif all_requests[i]['RIDE_SHARING'][previous_gamma] == False:
+						all_requests[i]['RIDE_SHARING'][current_gamma] = (random.uniform(0,1) < prob_threshold)
+					elif all_requests[i]['RIDE_SHARING'][previous_gamma] == True:
+						all_requests[i]['RIDE_SHARING'][current_gamma] = True
+
+				else:
+					all_requests[i]['RIDE_SHARING'][current_gamma] = True
+
+
+			#Adding requests not in market share into the ride sharing pool
+			if all_requests[i]['PROVIDER_MARKET']['no_gamma'] == False:
+
+				prob_threshold *= PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL
+
+				if idx == 0:
+					all_requests[i]['RIDE_SHARING'][current_gamma] = (random.uniform(0,1) < prob_threshold)
+				elif all_requests[i]['RIDE_SHARING'][previous_gamma] == False:
+					all_requests[i]['RIDE_SHARING'][current_gamma] = (random.uniform(0,1) < prob_threshold)
+				elif all_requests[i]['RIDE_SHARING'][previous_gamma] == True:
+					all_requests[i]['RIDE_SHARING'][current_gamma] = True
+				
+				if all_requests[i]['RIDE_SHARING'][current_gamma]==True:
+					all_requests[i]['PROVIDER_MARKET'][current_gamma] = True
+				
+			previous_gamma = current_gamma
 
 	#permutations needed for two participant matching
 	all_permutations_two = {('si','sj','di','dj'):'case1',
@@ -78,7 +142,43 @@ def generate_instance():
 	'instance_params':{
 	'OUR_CUT_FROM_DRIVER': OUR_CUT_FROM_DRIVER,
 	'ALPHA_OP':ALPHA_OP,
-	'all_permutations_two': all_permutations_two}}
+	'all_permutations_two': all_permutations_two,
+	'GAMMA_ARRAY':GAMMA_ARRAY}}
+
+def get_stats(instance):
+	#simple helper function to display
+	all_gammas = ['no_gamma']
+	all_gammas.extend(instance['instance_params']['GAMMA_ARRAY'])
+
+	result = []
+	for i in instance['all_requests']:
+		if instance['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==True:
+			result.append(i)
+			
+	print "\nRequests in provider market share initially w/o SIR-Gamma:"
+	print(result)
+
+	print "\nRequests in provider market initially:"
+	result = []
+	for gamma in all_gammas:
+		for i in instance['all_requests']:
+			if i in result:
+				continue
+			if instance['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==True:
+				if instance['all_requests'][i]['RIDE_SHARING'][gamma]==True:
+					print "{0} in ridesharing at gamma = {1}".format(i,gamma)
+					result.append(i)
+
+	
+	print "\nOutside provider market:"
+	result = []
+	for gamma in all_gammas:
+		for i in instance['all_requests']:
+			
+			if instance['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==False:
+				if instance['all_requests'][i]['RIDE_SHARING'][gamma]==True:
+					print "{0} in ridesharing at gamma = {1}".format(i,gamma)
+					result.append(i)
 
 def euclidean(x,y):
 	assert x is not None and y is not None
@@ -348,11 +448,12 @@ def get_incremental_profit(selected_requests,instance,experiment_params):
 		result -= get_profit_unmatched([i],instance)
 	return [result,result_permutation]
 
-def get_experiment_params():
+def get_experiment_params(instance):
 
 	DISCOUNT_SETTING = 'detour_based' # 'independent'
 	SIR_SETTING = False
 	GAMMA = 0 #valid only when SIR_SETTING is True
+	assert GAMMA in instance['instance_params']['GAMMA_ARRAY']
 
 	return {'DISCOUNT_SETTING':DISCOUNT_SETTING,
 	'SIR_SETTING':SIR_SETTING,
@@ -453,19 +554,11 @@ def get_profit_from_matched_requests(matched_request_pairs_with_permutations,ins
 		result += get_profit_matched(request_pairs,instance,matched_request_pairs_with_permutations[request_pairs],experiment_params)
 	return result
 
-def get_list_of_requests_interested_in_ridehsaring(instance):
-	#simple helper function to display
-	result = []
-	for i in instance['all_requests']:
-		if instance['all_requests'][i]['PROVIDER_MARKET']==True:
-			if instance['all_requests'][i]['RIDE_SHARING']==True:
-				result.append(i)
-	return result
-
 if __name__=='__main__':
 
 	instance = generate_instance()
-	experiment_params = get_experiment_params()
+	experiment_params = get_experiment_params(instance_params)
+
 	solution = match_requests(instance,experiment_params)
 	total_profit = \
 		get_profit_from_non_ridesharing_requests(solution['non_ridesharing_requests'],instance) + \
