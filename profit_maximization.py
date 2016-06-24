@@ -100,18 +100,16 @@ def generate_instance():
 			#Splitting the requests in the service provider part further into ride share and non-ride share
 			if all_requests[i]['PROVIDER_MARKET']['no_gamma'] == True:
 
-				if all_requests[i]['RIDE_SHARING']['no_gamma'] == False: #if they are not already ridesharing
-
-					prob_threshold *= PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL
+				prob_threshold *= PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL
 	
-					if idx == 0:
+				if idx == 0:
+					if all_requests[i]['RIDE_SHARING']['no_gamma'] == False:
 						all_requests[i]['RIDE_SHARING'][current_gamma] = (random.uniform(0,1) < prob_threshold)
-					elif all_requests[i]['RIDE_SHARING'][previous_gamma] == False:
-						all_requests[i]['RIDE_SHARING'][current_gamma] = (random.uniform(0,1) < prob_threshold)
-					elif all_requests[i]['RIDE_SHARING'][previous_gamma] == True:
+					else:
 						all_requests[i]['RIDE_SHARING'][current_gamma] = True
-
-				else:
+				elif all_requests[i]['RIDE_SHARING'][previous_gamma] == False: #flip a coin
+					all_requests[i]['RIDE_SHARING'][current_gamma] = (random.uniform(0,1) < prob_threshold)
+				elif all_requests[i]['RIDE_SHARING'][previous_gamma] == True: #copy previous val
 					all_requests[i]['RIDE_SHARING'][current_gamma] = True
 
 
@@ -174,7 +172,8 @@ def get_stats(instance):
 	result = []
 	for gamma in all_gammas:
 		for i in instance['all_requests']:
-			
+			if i in result:
+				continue
 			if instance['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==False:
 				if instance['all_requests'][i]['RIDE_SHARING'][gamma]==True:
 					print "{0} in ridesharing at gamma = {1}".format(i,gamma)
