@@ -298,7 +298,6 @@ def get_profit_matched(selected_requests,instance,permutation,experiment_params)
 		return instance_params['ALPHA_OP']*result - \
 			(1-instance_params['OUR_CUT_FROM_DRIVER'])*get_driving_distance(None,selected_requests,permutation,instance)
 
-
 def get_incremental_profit_subroutine(selected_requests,instance,experiment_params):
 	assert instance is not None
 	assert selected_requests is not None
@@ -454,6 +453,15 @@ def get_profit_from_matched_requests(matched_request_pairs_with_permutations,ins
 		result += get_profit_matched(request_pairs,instance,matched_request_pairs_with_permutations[request_pairs],experiment_params)
 	return result
 
+def get_list_of_requests_interested_in_ridehsaring(instance):
+	#simple helper function to display
+	result = []
+	for i in instance['all_requests']:
+		if instance['all_requests'][i]['PROVIDER_MARKET']==True:
+			if instance['all_requests'][i]['RIDE_SHARING']==True:
+				result.append(i)
+	return result
+
 if __name__=='__main__':
 
 	instance = generate_instance()
@@ -466,9 +474,3 @@ if __name__=='__main__':
 
 	print "total profit:",total_profit
 	pprint(solution)
-
-	## debug
-	# for i in instance['all_requests']:
-	# 	if instance['all_requests'][i]['PROVIDER_MARKET']==True:
-	# 		if instance['all_requests'][i]['RIDE_SHARING']==True:
-	# 			print i
