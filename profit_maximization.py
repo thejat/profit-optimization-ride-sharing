@@ -15,8 +15,6 @@ def generate_instance():
 	#requests and service provider details
 
 	NO_OF_REQUESTS_IN_UNIVERSE = 30
-	INITIAL_MARKET_SHARE_OF_SERVICE_PROVIDER = .6
-	INITIAL_RIDE_SHARING_AMONG_SERVICE_PROVIDER = .3
 	BETA1 = 0.9
 	BETA2 = 0.8 #dummy for detour based discounting setting.
 
@@ -75,14 +73,14 @@ def generate_instance():
 
 	#No SIR ridesharers in provider's market
 	for i in all_requests:
-		prob_threshold = PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA*\
-			(1-all_requests[i]['our_cut_from_requester'][1])/ \
-			all_requests[i]['detour_sensitivity']
 		if all_requests[i]['PROVIDER_MARKET']['no_gamma'] == True:
+			prob_threshold = PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA*\
+				(1-all_requests[i]['our_cut_from_requester'][1])/ \
+				all_requests[i]['detour_sensitivity']
 			all_requests[i]['RIDE_SHARING']['no_gamma'] = (random.uniform(0,1) < prob_threshold)
 
 
-	#Intoducing SIR as a function of gamma: Now, both internal (in provier_market) and external (not in provider market) requests
+	#Intoducing SIR as a function of gamma: Now, both internal (in PROVIDER_MARKET) and external (not in PROVIDER_MARKET) requests change their membership/preference
 
 
 	previous_gamma = None
@@ -556,7 +554,7 @@ def get_profit_from_matched_requests(matched_request_pairs_with_permutations,ins
 if __name__=='__main__':
 
 	instance = generate_instance()
-	experiment_params = get_experiment_params(instance_params)
+	experiment_params = get_experiment_params(instance)
 
 	solution = match_requests(instance,experiment_params)
 	total_profit = \
