@@ -14,7 +14,7 @@ def generate_instance():
 
 	#requests and service provider details
 
-	NO_OF_REQUESTS_IN_UNIVERSE = 30
+	NO_OF_REQUESTS_IN_UNIVERSE = 100
 	BETA1 = 0.9
 	BETA2 = 0.8 #dummy for detour based discounting setting.
 
@@ -22,14 +22,14 @@ def generate_instance():
 	GRID_MAX_X = GRID_MAX
 	GRID_MAX_Y = GRID_MAX
 
-	MAX_DETOUR_SENSITIVITY = 1000
+	MAX_DETOUR_SENSITIVITY = 100
 
 	OUR_CUT_FROM_DRIVER = 0.3
 	ALPHA_OP = MAX_DETOUR_SENSITIVITY/2
 
 	GAMMA_ARRAY = [0.5*x for x in range(0,5)]
 
-	PROB_PARAM_MARKET_SHARE = 300.0/ALPHA_OP
+	PROB_PARAM_MARKET_SHARE = .6#300.0/ALPHA_OP
 
 	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA = 200
 
@@ -227,12 +227,20 @@ def get_driving_distance(focus_request,selected_requests,permutation,instance):
 	else:
 		raise Exception
 
-def check_SIR_satisfaction_general(selected_requests,permutation,instance,experiment_params):
+def check_SIR(selected_requests,permutation,instance,experiment_params):
 	
 	#if SIR constraints are not applicable, then we should not check SIR
 	if experiment_params['GAMMA']=='no_gamma':
 		return True
+	elif experiment_params['DISCOUNT_SETTING'] == 'detour_based':
+		return check_SIR_satisfaction_detour_based(selected_requests,permutation,instance,experiment_params)
+	elif experiment_params['DISCOUNT_SETTING'] == 'independent':
+		return check_SIR_satisfaction_general(selected_requests,permutation,instance,experiment_params)
+	else:
+		return NotImplementedError
 
+def check_SIR_satisfaction_general(selected_requests,permutation,instance,experiment_params):
+	
 	all_requests = instance['all_requests'] #local copy
 	all_permutations_two = instance['instance_params']['all_permutations_two']
 
@@ -278,15 +286,12 @@ def check_SIR_satisfaction_general(selected_requests,permutation,instance,experi
 			print "Error!" #TODO
 			constraint_i = False
 			constraint_j = False
+			return NotImplementedError #todo: change to appropriate error
 
 		return constraint_i and constraint_j
 
 def check_SIR_satisfaction_detour_based(selected_requests,permutation,instance,experiment_params):
 	
-	#if sir constraints are not applicable, then we should not check SIR
-	if experiment_params['GAMMA']=='no_gamma':
-		return True
-
 	all_requests = instance['all_requests'] #local copy
 	all_permutations_two = instance['instance_params']['all_permutations_two']
 
@@ -372,7 +377,13 @@ def get_profit_matched(selected_requests,instance,permutation,experiment_params)
 		return instance_params['ALPHA_OP']*result - \
 			(1-instance_params['OUR_CUT_FROM_DRIVER'])*get_driving_distance(None,selected_requests,permutation,instance)
 
-def get_incremental_profit_subroutine(selected_requests,instance,experiment_params):
+def get_incremental_profit(selected_requests,instance,experiment_params):
+
+	'''
+	if incremental profit is less than or equal to zero then there is
+	no way to match the selected requests in a way that satisfies SIR and is incremetally profitable
+	'''
+
 	assert instance is not None
 	assert selected_requests is not None
 
@@ -381,18 +392,14 @@ def get_incremental_profit_subroutine(selected_requests,instance,experiment_para
 	instance_params = instance['instance_params']
 	all_permutations_two = instance['instance_params']['all_permutations_two']
 
-
-	if experiment_params['DISCOUNT_SETTING'] == 'detour_based':
-		check_SIR_routine = check_SIR_satisfaction_detour_based
-	elif experiment_params['DISCOUNT_SETTING'] == 'independent':
-		check_SIR_routine = check_SIR_satisfaction_general
-
 	#Logic
 	if len(selected_requests) > 2:
 		return NotImplementedError
 
 	if len(selected_requests) == 1:
-		return [ get_profit_unmatched(selected_requests,instance) , ('si','di') ]
+		#ideally this should not be executed, since incremental profit is zero here.
+		max_profit =  get_profit_unmatched(selected_requests,instance)
+		max_profit_permutation =  ('si','di')
 
 	if len(selected_requests) == 2:
 		i = selected_requests[0]
@@ -402,38 +409,22 @@ def get_incremental_profit_subroutine(selected_requests,instance,experiment_para
 		max_profit = 0
 		max_profit_permutation = None
 		for k,permutation in enumerate(all_permutations_two):
-			SIR_satisfied = check_SIR_routine([i,j],permutation,instance, experiment_params)
+			SIR_satisfied = check_SIR([i,j],permutation,instance, experiment_params)
 			if SIR_satisfied is True:
 				profits[k] = get_profit_matched([i,j],instance,permutation,experiment_params)
 			if profits[k] > max_profit:
 				max_profit_permutation = copy.deepcopy(permutation)
 				max_profit = profits[k]
 
-		return [max_profit,max_profit_permutation]
-
-def get_incremental_profit(selected_requests,instance,experiment_params):
-	'''
-	if incremental profit is less than or equal to zero then there is
-	no way to match the selected requests in a way that satisfies SIR and is incremetally profitable
-	'''
-
-	result,result_permutation = get_incremental_profit_subroutine(selected_requests,instance,experiment_params)
+	#assumes max_profit exists
+	#to get incremental profit, subtracting the profits from their dedicated rides, have to give discounts because they wanted to rideshare but we couldn't match them
 	for i in selected_requests:
-		result -= get_profit_unmatched([i],instance)
-	return [result,result_permutation]
+		max_profit -= get_profit_unmatched([i],instance)
+	return [max_profit,max_profit_permutation]
 
-def get_experiment_params(instance):
-
-	DISCOUNT_SETTING = 'detour_based' # 'independent'
-	GAMMA = 'no_gamma' 
-	assert GAMMA in instance['instance_params']['GAMMA_ARRAY_ALL']
-
-	return {'DISCOUNT_SETTING':DISCOUNT_SETTING,
-	'GAMMA':GAMMA}
-
-def is_ridesharing(i,instance,experiment_params):
+def is_interested_in_ridesharing(i,instance,experiment_params):
 	GAMMA = experiment_params['GAMMA']
-	if instance['all_requests'][i]['PROVIDER_MARKET'][GAMMA]==True:
+	if instance['all_requests'][i]['PROVIDER_MARKET'][GAMMA]==True:#maybe redundant
 		if instance['all_requests'][i]['RIDE_SHARING'][GAMMA]==True:
 			return True
 	return False #default
@@ -445,16 +436,21 @@ def match_requests(instance,experiment_params):
 	non_ridesharing_requests = []
 	unmatched_requests_initial = set()
 	for i in instance['all_requests']:
-		if is_ridesharing(i,instance,experiment_params) is False:
+		if is_interested_in_ridesharing(i,instance,experiment_params) is False:
 			# print "{0} is not ridesharing.".format(i)
 			non_ridesharing_requests.append(i)
 			continue
 		for j in instance['all_requests']:
-			if i < j and is_ridesharing(j,instance,experiment_params) is True:
+			if i < j and is_interested_in_ridesharing(j,instance,experiment_params) is True:#cover the symmetric relation as well the the case i!=j
+
+				#adding both as candidates that wanted to rideshare but could not be matched
 				unmatched_requests_initial.add(i)
 				unmatched_requests_initial.add(j)
 				#print "i,j = {0},{1}".format(i,j)
+
+				#get a permutation and the incremental profit for the pair i,j
 				[incremental_profit,optimal_permutation] = get_incremental_profit([i,j],instance,experiment_params)
+
 				if  incremental_profit > 0:
 					H.add_edge(str(i), str(j), weight=incremental_profit)
 					request_pairs_with_permutations[(i,j)] = optimal_permutation
@@ -462,9 +458,11 @@ def match_requests(instance,experiment_params):
 
 	#these requests failed to satisfy incremental profit > 0 for any of their potential ridesharing neighbors
 	#pprint(unmatched_requests_initial)
-	print H.nodes()
+	#print H.nodes()
 	unmatched_requests_initial = [x for x in unmatched_requests_initial if str(x) not in H.nodes()]
 	#pprint(unmatched_requests_initial)
+
+	print "Size of matching graph:",len(H.nodes())
 
 	mates = nx.max_weight_matching(H)
 	matched_request_pairs_with_permutations = {}
@@ -527,6 +525,16 @@ def get_profit_from_matched_requests(matched_request_pairs_with_permutations,ins
 		result += get_profit_matched(request_pairs,instance,matched_request_pairs_with_permutations[request_pairs],experiment_params)
 	return result
 
+def solve_instance(instance,experiment_params):
+
+	solution = match_requests(instance,experiment_params)
+	total_profit = \
+		get_profit_from_non_ridesharing_requests(solution['non_ridesharing_requests'],instance) + \
+		get_profit_from_unmatched_requests(solution['unmatched_requests'],instance) + \
+		get_profit_from_matched_requests(solution['matched_request_pairs_with_permutations'],instance,experiment_params)
+
+	return solution,total_profit
+
 def get_stats(instance):
 	#simple helper function to display
 	all_gammas = ['no_gamma']
@@ -537,8 +545,12 @@ def get_stats(instance):
 		if instance['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==True:
 			result.append(i)
 			
-	print "\nRequests in provider market share initially w/o SIR-Gamma:"
+	print "\nRequests in provider market share initially w/o SIR-Gamma:",len(result)
 	print(result)
+
+	result2 = [x for x in instance['all_requests'] if x not in result]
+	print "\nRequests NOT in provider market share initially w/o SIR-Gamma:",len(result2)
+	print(result2)
 
 	print "\nRequests in provider market initially:"
 	result = []
@@ -564,6 +576,12 @@ def get_stats(instance):
 					result.append(i)
 
 
+	for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
+		print "No of potential ridesharers at Gamma = {0}: {1}".format(gamma,len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True]))
+
+	for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
+		print "No of potential ridesharers at Gamma = {0}: {1}".format(gamma,len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True and instance['all_requests'][x]['PROVIDER_MARKET'][gamma]==True]))
+
 	data = np.zeros((len(instance['all_requests']),len(instance['instance_params']['GAMMA_ARRAY_ALL'])))
 	for x in instance['all_requests']:
 		request = instance['all_requests'][x]
@@ -577,22 +595,27 @@ def get_stats(instance):
 				data[x,i] = 1
 			else:
 				data[x,i] = 0
-	for i in range(data.shape[0]):
-		print i,data[i]
+	# for i in range(data.shape[0]):
+		# print i,data[i]
 
+def get_experiment_params(instance,GAMMA='no_gamma'):
 
+	DISCOUNT_SETTING = 'detour_based' # 'independent'
+	assert GAMMA in instance['instance_params']['GAMMA_ARRAY_ALL']
+
+	return {'DISCOUNT_SETTING':DISCOUNT_SETTING,
+	'GAMMA':GAMMA}
 
 if __name__=='__main__':
 
 	instance = generate_instance()
-	experiment_params = get_experiment_params(instance)
 	get_stats(instance)
 
-	# solution = match_requests(instance,experiment_params)
-	# total_profit = \
-	# 	get_profit_from_non_ridesharing_requests(solution['non_ridesharing_requests'],instance) + \
-	# 	get_profit_from_unmatched_requests(solution['unmatched_requests'],instance) + \
-	# 	get_profit_from_matched_requests(solution['matched_request_pairs_with_permutations'],instance,experiment_params)
-
-	# print "total profit:",total_profit
-	# pprint(solution)
+	do_experiment = True
+	if do_experiment is True:
+		for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
+			print 'Gamma = ',gamma
+			experiment_params = get_experiment_params(instance,GAMMA=gamma)
+			solution,total_profit = solve_instance(instance,experiment_params)
+			print "total profit:",total_profit
+			# pprint(solution)
