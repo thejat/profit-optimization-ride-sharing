@@ -1,4 +1,4 @@
-import random, time, pulp, math, copy
+import random, time, math, copy, pickle
 import networkx as nx
 import numpy as np
 from pprint import pprint
@@ -10,34 +10,34 @@ random.seed(5000)  # for replicability of experiments.
 __author__ = 'q4fj4lj9'
 
 
-def generate_instance():
+def generate_base_instance():
 
 	#requests and service provider details
 
 	NO_OF_REQUESTS_IN_UNIVERSE = 100
 	BETA1 = 0.9
 	BETA2 = 0.8 #dummy for detour based discounting setting.
+	OUR_CUT_FROM_REQUESTER_COMMON = {1:BETA1,2:BETA2}
+	MAX_DETOUR_SENSITIVITY = 100
 
 	GRID_MAX   = 100
 	GRID_MAX_X = GRID_MAX
 	GRID_MAX_Y = GRID_MAX
 
-	MAX_DETOUR_SENSITIVITY = 100
-
 	OUR_CUT_FROM_DRIVER = 0.3
 	ALPHA_OP = MAX_DETOUR_SENSITIVITY/2
 
-	GAMMA_ARRAY = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+	GAMMA_ARRAY = linspace(0,BETA1,5)
+	GAMMA_ARRAY_ALL = ['no_gamma'] 	#redundant array
+	GAMMA_ARRAY_ALL.extend(GAMMA_ARRAY)
 
-	PROB_PARAM_MARKET_SHARE = .6#300.0/ALPHA_OP
+	#permutations needed for two participant matching
+	all_permutations_two = {('si','sj','di','dj'):'case1',
+			('si','sj','dj','di'):'case2',
+			('sj','si','dj','di'):'case1',
+			('sj','si','di','dj'):'case2'}#TODO: make more comprehensible
 
-	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA = 200
-
-	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL = 200
-
-	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL = 0.5*PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL
-
-
+	# GENERATE OD locations for all requests
 	all_requests = OrderedDict()
 	for i in range(NO_OF_REQUESTS_IN_UNIVERSE):
 		all_requests[i] = OrderedDict()
@@ -53,7 +53,7 @@ def generate_instance():
 
 		all_requests[i]['detour_sensitivity_normalized'] = all_requests[i]['detour_sensitivity']*1.0/ALPHA_OP
 
-		all_requests[i]['our_cut_from_requester'] = {1:BETA1,2:BETA2}
+		all_requests[i]['our_cut_from_requester'] = OUR_CUT_FROM_REQUESTER_COMMON
 
 		#some default values
 		all_requests[i]['PROVIDER_MARKET'] = OrderedDict()
@@ -67,16 +67,36 @@ def generate_instance():
 		for gamma in GAMMA_ARRAY:
 			all_requests[i]['RIDE_SHARING'][gamma] = False
 		
+	#Flipping coins is moved to its own function
 
-	#Splitting the universe into service provider part and non service provider part
+	return {'all_requests': all_requests,
+	'instance_params':{
+	'OUR_CUT_FROM_DRIVER': OUR_CUT_FROM_DRIVER,
+	'ALPHA_OP':ALPHA_OP,
+	'all_permutations_two': all_permutations_two,
+	'GAMMA_ARRAY':GAMMA_ARRAY,
+	'GAMMA_ARRAY_ALL': GAMMA_ARRAY_ALL}}
+
+def flip_coins_for(coin_flip_no,instance_base,coin_flip_params):
+
+	instance = copy.deepcopy(instance_base)
+
+	#local copy
+	all_requests = instance['all_requests']
+	GAMMA_ARRAY  = instance['instance_params']['GAMMA_ARRAY']
+	PROB_PARAM_MARKET_SHARE 					= coin_flip_params['PROB_PARAM_MARKET_SHARE']
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA = coin_flip_params['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA']
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL = coin_flip_params['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL']
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL = coin_flip_params['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL']
+
+	#COIN FLIPS: Splitting the universe into service provider part and non service provider part
 	for i in all_requests:
 		if random.uniform(0,1) < PROB_PARAM_MARKET_SHARE:
 			all_requests[i]['PROVIDER_MARKET']['no_gamma'] = True
 			for gamma in GAMMA_ARRAY:#redundant
 				all_requests[i]['PROVIDER_MARKET'][gamma] = True
 
-
-	#No SIR ridesharers in provider's market
+	#COIN FLIPS: No SIR ridesharers in provider's market
 	for i in all_requests:
 		if all_requests[i]['PROVIDER_MARKET']['no_gamma'] == True:
 			prob_threshold = PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA*\
@@ -87,10 +107,7 @@ def generate_instance():
 				for gamma in GAMMA_ARRAY:#redundant
 					all_requests[i]['RIDE_SHARING'][gamma] = True
 
-
-	#Intoducing SIR as a function of gamma: Now, both internal (in PROVIDER_MARKET) and external (not in PROVIDER_MARKET) requests change their membership/preference
-
-
+	#COIN FLIPS: Intoducing SIR as a function of gamma: Now, both internal (in PROVIDER_MARKET) and external (not in PROVIDER_MARKET) requests change their membership/preference
 	previous_gamma = None
 	for idx,current_gamma in enumerate(GAMMA_ARRAY):
 
@@ -136,23 +153,15 @@ def generate_instance():
 				
 		previous_gamma = current_gamma
 
-	#permutations needed for two participant matching
-	all_permutations_two = {('si','sj','di','dj'):'case1',
-			('si','sj','dj','di'):'case2',
-			('sj','si','dj','di'):'case1',
-			('sj','si','di','dj'):'case2'}#TODO: make more comprehensible
 
-	#redundant array
-	GAMMA_ARRAY_ALL = ['no_gamma']
-	GAMMA_ARRAY_ALL.extend(GAMMA_ARRAY)
+	instance['all_requests'] = all_requests
+	return instance
 
-	return {'all_requests': all_requests,
-	'instance_params':{
-	'OUR_CUT_FROM_DRIVER': OUR_CUT_FROM_DRIVER,
-	'ALPHA_OP':ALPHA_OP,
-	'all_permutations_two': all_permutations_two,
-	'GAMMA_ARRAY':GAMMA_ARRAY,
-	'GAMMA_ARRAY_ALL': GAMMA_ARRAY_ALL}}
+def linspace(a, b, n=5):
+    if n < 2:
+        return b
+    diff = (float(b) - a)/(n - 1)
+    return [diff * i + a  for i in range(n)]
 
 def euclidean(x,y):
 	assert x is not None and y is not None
@@ -462,8 +471,6 @@ def match_requests(instance,experiment_params):
 	unmatched_requests_initial = [x for x in unmatched_requests_initial if str(x) not in H.nodes()]
 	#pprint(unmatched_requests_initial)
 
-	print "Size of matching graph:",len(H.nodes())
-
 	mates = nx.max_weight_matching(H)
 	matched_request_pairs_with_permutations = {}
 	for i,j in mates.items():
@@ -480,7 +487,8 @@ def match_requests(instance,experiment_params):
 
 	result =  {'non_ridesharing_requests':non_ridesharing_requests,
 	'unmatched_requests':unmatched_requests,
-	'matched_request_pairs_with_permutations':matched_request_pairs_with_permutations}
+	'matched_request_pairs_with_permutations':matched_request_pairs_with_permutations,
+	'matching_graph':H}
 
 	# pprint(result)
 
@@ -533,6 +541,7 @@ def solve_instance(instance,experiment_params):
 		get_profit_from_unmatched_requests(solution['unmatched_requests'],instance) + \
 		get_profit_from_matched_requests(solution['matched_request_pairs_with_permutations'],instance,experiment_params)
 
+	print "Expeeriment: Gamma = {3}. Total profit: {0}. Size of matching graph: {1}. #Total ridesharers: {2}".format(total_profit,len(solution['matching_graph'].nodes()),len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True]),experiment_params['GAMMA'])
 	return solution,total_profit
 
 def get_stats(instance):
@@ -544,47 +553,47 @@ def get_stats(instance):
 		if instance['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==True:
 			result.append(i)
 			
-	print "\nRequests in provider market share initially w/o SIR-Gamma:",len(result)
+	print "Instance: Requests in provider market share initially w/o SIR-Gamma:",len(result)
 	# print(result)
 
 	result2 = [x for x in instance['all_requests'] if x not in result]
-	print "\nRequests NOT in provider market share initially w/o SIR-Gamma:",len(result2)
+	print "Instance: Requests NOT in provider market share initially w/o SIR-Gamma:",len(result2)
 	# print(result2)
 
-	print "\nRequests in provider market initially:"
-	result = []
-	for gamma in all_gammas:
-		counter = 0
-		for i in instance['all_requests']:
-			if i in result:
-				counter += 1
-				continue
-			if instance['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==True:
-				if instance['all_requests'][i]['RIDE_SHARING'][gamma]==True:
-					counter +=1
-					# print "{0} in ridesharing at gamma = {1}".format(i,gamma)
-					result.append(i)
-		print "No of people ridesharing at gamma = {0} is {1}".format(gamma,counter)
+	# #Requests in provider market initially
+	# result = []
+	# for gamma in all_gammas:
+	# 	counter = 0
+	# 	for i in instance['all_requests']:
+	# 		if i in result:
+	# 			counter += 1
+	# 			continue
+	# 		if instance['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==True:
+	# 			if instance['all_requests'][i]['RIDE_SHARING'][gamma]==True:
+	# 				counter +=1
+	# 				# print "{0} in ridesharing at gamma = {1}".format(i,gamma)
+	# 				result.append(i)
+	# 	print "Instance: Initially in market: #People ridesharing at gamma = {0} is {1}".format(gamma,counter)
 
 	
-	print "\nOutside provider market:"
-	result = []
-	for gamma in all_gammas:
-		counter = 0
-		for i in instance['all_requests']:
-			if i in result:
-				counter += 1
-				continue
-			if instance['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==False:
-				if instance['all_requests'][i]['RIDE_SHARING'][gamma]==True:
-					counter += 1
-					# print "{0} in ridesharing at gamma = {1}".format(i,gamma)
-					result.append(i)
-		print "No of people ridesharing at gamma = {0} is {1}".format(gamma,counter)
+	# #Outside provider market
+	# result = []
+	# for gamma in all_gammas:
+	# 	counter = 0
+	# 	for i in instance['all_requests']:
+	# 		if i in result:
+	# 			counter += 1
+	# 			continue
+	# 		if instance['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==False:
+	# 			if instance['all_requests'][i]['RIDE_SHARING'][gamma]==True:
+	# 				counter += 1
+	# 				# print "{0} in ridesharing at gamma = {1}".format(i,gamma)
+	# 				result.append(i)
+	# 	print "Instance: Initially out market: #People ridesharing at gamma = {0} is {1}".format(gamma,counter)
 
 
 	for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
-		print "No of potential ridesharers at Gamma = {0}: {1}".format(gamma,len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True]))
+		print "Instance: No of total potential ridesharers at Gamma = {0}: {1}".format(gamma,len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True]))
 
 	# for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
 	# 	print "No of potential ridesharers at Gamma = {0}: {1}".format(gamma,len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True and instance['all_requests'][x]['PROVIDER_MARKET'][gamma]==True]))
@@ -605,30 +614,43 @@ def get_stats(instance):
 	# for i in range(data.shape[0]):
 		# print i,data[i]
 
-def get_experiment_params(instance,GAMMA='no_gamma'):
+def get_coin_flip_params():
+	
+	PROB_PARAM_MARKET_SHARE = .6#300.0/ALPHA_OP
 
-	DISCOUNT_SETTING = 'detour_based' # 'independent'
-	assert GAMMA in instance['instance_params']['GAMMA_ARRAY_ALL']
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA = 200
 
-	return {'DISCOUNT_SETTING':DISCOUNT_SETTING,
-	'GAMMA':GAMMA}
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL = 200
+
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL = 0.5*PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL
+
+	return {'PROB_PARAM_MARKET_SHARE':PROB_PARAM_MARKET_SHARE,
+	'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA':PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA,
+	'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL':PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL,
+	'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL': PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL}
 
 # vprof -c cmh -s profit_maximization.py
 if __name__=='__main__':
 
 	do_experiment = True
-	no_INSTANCES = 10
+	no_INSTANCES  = 1
+	no_COIN_FLIPS = 10
+	coin_flip_params = get_coin_flip_params()
 	for i in range(no_INSTANCES):
-		print 'Generating instance: The time is      :', time.ctime()
-		instance = generate_instance()
-		get_stats(instance)
+		print 'Generating instance {0}: The time is : {1}'.format(i,time.ctime())
+		instance_base = generate_base_instance()
 
-		print 'Experiment: The time is      :', time.ctime()
-		if do_experiment is True:
-			for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
-				print 'Gamma = {0}. The time is      : {1}'.format(gamma,time.ctime())
-				experiment_params = get_experiment_params(instance,GAMMA=gamma)
-				solution,total_profit = solve_instance(instance,experiment_params)
-				print "total profit:",total_profit
-				# pprint(solution)
+		total_profit_array = np.zeros((len(instance_base['instance_params']['GAMMA_ARRAY_ALL']),no_COIN_FLIPS))
+		for coin_flip_no in range(no_COIN_FLIPS):
+			instance = flip_coins_for(coin_flip_no,instance_base,coin_flip_params)
+			get_stats(instance)
+
+			print 'Coin Flip no {0}: Starting corresponding experiment: The time is :{1}'.format(coin_flip_no,time.ctime())
+			if do_experiment is True:
+				for idx,gamma in enumerate(instance['instance_params']['GAMMA_ARRAY_ALL']):
+					experiment_params = {'DISCOUNT_SETTING':'detour_based','GAMMA':gamma} # 'independent'
+					solution,total_profit = solve_instance(instance,experiment_params)
+					total_profit_array[idx,coin_flip_no] = total_profit
 				
+	print 'Ending all experiments: The time is :', time.ctime()
+	pickle.dump(total_profit_array,open('plot_data.pkl','wb'))
