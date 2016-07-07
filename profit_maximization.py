@@ -1,6 +1,5 @@
-import random, time, math, copy, pickle
+import random, time, math, copy, numpy, pickle
 import networkx as nx
-import numpy as np
 from pprint import pprint
 from collections import OrderedDict
 # import  matplotlib
@@ -27,7 +26,7 @@ def generate_base_instance():
 	OUR_CUT_FROM_DRIVER = 0.3
 	ALPHA_OP = MAX_DETOUR_SENSITIVITY/2
 
-	GAMMA_ARRAY = linspace(0,BETA1,5)
+	GAMMA_ARRAY = [float("%.3f" % (BETA1**(2*x+1))) for x in range(10,-1,-2)]
 	GAMMA_ARRAY_ALL = ['no_gamma'] 	#redundant array
 	GAMMA_ARRAY_ALL.extend(GAMMA_ARRAY)
 
@@ -46,8 +45,8 @@ def generate_base_instance():
 		all_requests[i]['orig'] = (0,0)
 		all_requests[i]['dest'] = (0,0)
 		while all_requests[i]['orig'][0]==all_requests[i]['dest'][0] and all_requests[i]['orig'][1]==all_requests[i]['dest'][1]:
-			all_requests[i]['orig'] = np.array([random.randint(0,GRID_MAX_X),random.randint(0,GRID_MAX_Y)])
-			all_requests[i]['dest'] = np.array([random.randint(0,GRID_MAX_X),random.randint(0,GRID_MAX_Y)])
+			all_requests[i]['orig'] = numpy.array([random.randint(0,GRID_MAX_X),random.randint(0,GRID_MAX_Y)])
+			all_requests[i]['dest'] = numpy.array([random.randint(0,GRID_MAX_X),random.randint(0,GRID_MAX_Y)])
 
 		all_requests[i]['detour_sensitivity'] = random.randint(1,MAX_DETOUR_SENSITIVITY)
 
@@ -165,7 +164,7 @@ def linspace(a, b, n=5):
 
 def euclidean(x,y):
 	assert x is not None and y is not None
-	return np.linalg.norm(x - y)
+	return numpy.linalg.norm(x - y)
 
 def get_driving_distance(focus_request,selected_requests,permutation,instance):
 
@@ -414,7 +413,7 @@ def get_incremental_profit(selected_requests,instance,experiment_params):
 		i = selected_requests[0]
 		j = selected_requests[1]
 
-		profits = np.zeros(len(all_permutations_two))
+		profits = numpy.zeros(len(all_permutations_two))
 		max_profit = 0
 		max_profit_permutation = None
 		for k,permutation in enumerate(all_permutations_two):
@@ -598,7 +597,7 @@ def get_stats(instance):
 	# for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
 	# 	print "No of potential ridesharers at Gamma = {0}: {1}".format(gamma,len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True and instance['all_requests'][x]['PROVIDER_MARKET'][gamma]==True]))
 
-	data = np.zeros((len(instance['all_requests']),len(instance['instance_params']['GAMMA_ARRAY_ALL'])))
+	data = numpy.zeros((len(instance['all_requests']),len(instance['instance_params']['GAMMA_ARRAY_ALL'])))
 	for x in instance['all_requests']:
 		request = instance['all_requests'][x]
 		# for i,e in enumerate(request['PROVIDER_MARKET']):
@@ -640,7 +639,7 @@ if __name__=='__main__':
 		print 'Generating instance {0}: The time is : {1}'.format(i,time.ctime())
 		instance_base = generate_base_instance()
 
-		total_profit_array = np.zeros((len(instance_base['instance_params']['GAMMA_ARRAY_ALL']),no_COIN_FLIPS))
+		total_profit_array = numpy.zeros((len(instance_base['instance_params']['GAMMA_ARRAY_ALL']),no_COIN_FLIPS))
 		for coin_flip_no in range(no_COIN_FLIPS):
 			instance = flip_coins_for(coin_flip_no,instance_base,coin_flip_params)
 			get_stats(instance)
@@ -653,4 +652,4 @@ if __name__=='__main__':
 					total_profit_array[idx,coin_flip_no] = total_profit
 				
 	print 'Ending all experiments: The time is :', time.ctime()
-	pickle.dump(total_profit_array,open('plot_data.pkl','wb'))
+	pickle.dump({'total_profit_array':total_profit_array,'instance':instance},open('plot_data.pkl','wb'))
