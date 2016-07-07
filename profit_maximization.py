@@ -27,7 +27,7 @@ def generate_instance():
 	OUR_CUT_FROM_DRIVER = 0.3
 	ALPHA_OP = MAX_DETOUR_SENSITIVITY/2
 
-	GAMMA_ARRAY = [0.5*x for x in range(0,5)]
+	GAMMA_ARRAY = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
 
 	PROB_PARAM_MARKET_SHARE = .6#300.0/ALPHA_OP
 
@@ -537,8 +537,7 @@ def solve_instance(instance,experiment_params):
 
 def get_stats(instance):
 	#simple helper function to display
-	all_gammas = ['no_gamma']
-	all_gammas.extend(instance['instance_params']['GAMMA_ARRAY'])
+	all_gammas = instance['instance_params']['GAMMA_ARRAY_ALL']
 
 	result = []
 	for i in instance['all_requests']:
@@ -546,41 +545,49 @@ def get_stats(instance):
 			result.append(i)
 			
 	print "\nRequests in provider market share initially w/o SIR-Gamma:",len(result)
-	print(result)
+	# print(result)
 
 	result2 = [x for x in instance['all_requests'] if x not in result]
 	print "\nRequests NOT in provider market share initially w/o SIR-Gamma:",len(result2)
-	print(result2)
+	# print(result2)
 
 	print "\nRequests in provider market initially:"
 	result = []
 	for gamma in all_gammas:
+		counter = 0
 		for i in instance['all_requests']:
 			if i in result:
+				counter += 1
 				continue
 			if instance['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==True:
 				if instance['all_requests'][i]['RIDE_SHARING'][gamma]==True:
-					print "{0} in ridesharing at gamma = {1}".format(i,gamma)
+					counter +=1
+					# print "{0} in ridesharing at gamma = {1}".format(i,gamma)
 					result.append(i)
+		print "No of people ridesharing at gamma = {0} is {1}".format(gamma,counter)
 
 	
 	print "\nOutside provider market:"
 	result = []
 	for gamma in all_gammas:
+		counter = 0
 		for i in instance['all_requests']:
 			if i in result:
+				counter += 1
 				continue
 			if instance['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==False:
 				if instance['all_requests'][i]['RIDE_SHARING'][gamma]==True:
-					print "{0} in ridesharing at gamma = {1}".format(i,gamma)
+					counter += 1
+					# print "{0} in ridesharing at gamma = {1}".format(i,gamma)
 					result.append(i)
+		print "No of people ridesharing at gamma = {0} is {1}".format(gamma,counter)
 
 
 	for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
 		print "No of potential ridesharers at Gamma = {0}: {1}".format(gamma,len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True]))
 
-	for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
-		print "No of potential ridesharers at Gamma = {0}: {1}".format(gamma,len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True and instance['all_requests'][x]['PROVIDER_MARKET'][gamma]==True]))
+	# for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
+	# 	print "No of potential ridesharers at Gamma = {0}: {1}".format(gamma,len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True and instance['all_requests'][x]['PROVIDER_MARKET'][gamma]==True]))
 
 	data = np.zeros((len(instance['all_requests']),len(instance['instance_params']['GAMMA_ARRAY_ALL'])))
 	for x in instance['all_requests']:
@@ -606,16 +613,22 @@ def get_experiment_params(instance,GAMMA='no_gamma'):
 	return {'DISCOUNT_SETTING':DISCOUNT_SETTING,
 	'GAMMA':GAMMA}
 
+# vprof -c cmh -s profit_maximization.py
 if __name__=='__main__':
 
-	instance = generate_instance()
-	get_stats(instance)
-
 	do_experiment = True
-	if do_experiment is True:
-		for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
-			print 'Gamma = ',gamma
-			experiment_params = get_experiment_params(instance,GAMMA=gamma)
-			solution,total_profit = solve_instance(instance,experiment_params)
-			print "total profit:",total_profit
-			# pprint(solution)
+	no_INSTANCES = 10
+	for i in range(no_INSTANCES):
+		print 'Generating instance: The time is      :', time.ctime()
+		instance = generate_instance()
+		get_stats(instance)
+
+		print 'Experiment: The time is      :', time.ctime()
+		if do_experiment is True:
+			for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
+				print 'Gamma = {0}. The time is      : {1}'.format(gamma,time.ctime())
+				experiment_params = get_experiment_params(instance,GAMMA=gamma)
+				solution,total_profit = solve_instance(instance,experiment_params)
+				print "total profit:",total_profit
+				# pprint(solution)
+				
