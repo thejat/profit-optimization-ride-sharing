@@ -27,6 +27,8 @@ def generate_base_instance():
 	ALPHA_OP = MAX_DETOUR_SENSITIVITY/2
 
 	GAMMA_ARRAY = [float("%.3f" % (BETA1**(2*x+1))) for x in range(10,-1,-2)]
+	GAMMA_ARRAY.append(0)
+	GAMMA_ARRAY = sorted(GAMMA_ARRAY)
 	GAMMA_ARRAY_ALL = ['no_gamma'] 	#redundant array
 	GAMMA_ARRAY_ALL.extend(GAMMA_ARRAY)
 
@@ -532,7 +534,7 @@ def get_profit_from_matched_requests(matched_request_pairs_with_permutations,ins
 		result += get_profit_matched(request_pairs,instance,matched_request_pairs_with_permutations[request_pairs],experiment_params)
 	return result
 
-def solve_instance(instance,experiment_params):
+def solve_instance(coin_flip_no,instance,experiment_params):
 
 	solution = match_requests(instance,experiment_params)
 	total_profit = \
@@ -540,10 +542,10 @@ def solve_instance(instance,experiment_params):
 		get_profit_from_unmatched_requests(solution['unmatched_requests'],instance) + \
 		get_profit_from_matched_requests(solution['matched_request_pairs_with_permutations'],instance,experiment_params)
 
-	print "Expeeriment: Gamma = {3}. Total profit: {0}. Size of matching graph: {1}. #Total ridesharers: {2}".format(total_profit,len(solution['matching_graph'].nodes()),len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True]),experiment_params['GAMMA'])
+	print "Coin flip no {4}: Experiment: Gamma = {3}. Total profit: {0}. Size of matching graph: {1}. #Total ridesharers: {2}".format(total_profit,len(solution['matching_graph'].nodes()),len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True]),experiment_params['GAMMA'],coin_flip_no)
 	return solution,total_profit
 
-def get_stats(instance):
+def get_stats(coin_flip_no,instance):
 	#simple helper function to display
 	all_gammas = instance['instance_params']['GAMMA_ARRAY_ALL']
 
@@ -552,11 +554,11 @@ def get_stats(instance):
 		if instance['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==True:
 			result.append(i)
 			
-	print "Instance: Requests in provider market share initially w/o SIR-Gamma:",len(result)
+	print "Coin flip no {0}: Instance: Requests in provider market share initially w/o SIR-Gamma:".format(coin_flip_no,len(result))
 	# print(result)
 
 	result2 = [x for x in instance['all_requests'] if x not in result]
-	print "Instance: Requests NOT in provider market share initially w/o SIR-Gamma:",len(result2)
+	print "Coin flip no {0}: Instance: Requests NOT in provider market share initially w/o SIR-Gamma:".format(coin_flip_no,len(result2))
 	# print(result2)
 
 	# #Requests in provider market initially
@@ -591,8 +593,8 @@ def get_stats(instance):
 	# 	print "Instance: Initially out market: #People ridesharing at gamma = {0} is {1}".format(gamma,counter)
 
 
-	for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
-		print "Instance: No of total potential ridesharers at Gamma = {0}: {1}".format(gamma,len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True]))
+	# for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
+	# 	print "Instance: No of total potential ridesharers at Gamma = {0}: {1}".format(gamma,len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True]))
 
 	# for gamma in instance['instance_params']['GAMMA_ARRAY_ALL']:
 	# 	print "No of potential ridesharers at Gamma = {0}: {1}".format(gamma,len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][gamma]==True and instance['all_requests'][x]['PROVIDER_MARKET'][gamma]==True]))
@@ -619,7 +621,7 @@ def get_coin_flip_params():
 
 	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA = 200
 
-	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL = 200
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL = 100
 
 	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL = 0.5*PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL
 
@@ -642,14 +644,14 @@ if __name__=='__main__':
 		total_profit_array = numpy.zeros((len(instance_base['instance_params']['GAMMA_ARRAY_ALL']),no_COIN_FLIPS))
 		for coin_flip_no in range(no_COIN_FLIPS):
 			instance = flip_coins_for(coin_flip_no,instance_base,coin_flip_params)
-			get_stats(instance)
+			print 'Coin flip no {0}: Starting corresponding experiment: The time is :{1}'.format(coin_flip_no,time.ctime())
+			get_stats(coin_flip_no,instance)
 
-			print 'Coin Flip no {0}: Starting corresponding experiment: The time is :{1}'.format(coin_flip_no,time.ctime())
 			if do_experiment is True:
 				for idx,gamma in enumerate(instance['instance_params']['GAMMA_ARRAY_ALL']):
 					experiment_params = {'DISCOUNT_SETTING':'detour_based','GAMMA':gamma} # 'independent'
-					solution,total_profit = solve_instance(instance,experiment_params)
+					solution,total_profit = solve_instance(coin_flip_no,instance,experiment_params)
 					total_profit_array[idx,coin_flip_no] = total_profit
 				
 	print 'Ending all experiments: The time is :', time.ctime()
-	pickle.dump({'total_profit_array':total_profit_array,'instance':instance},open('plot_data.pkl','wb'))
+	pickle.dump({'total_profit_array':total_profit_array,'instance':instance},open('plot_data.pkl','wb'))	
