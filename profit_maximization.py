@@ -660,13 +660,10 @@ def get_stats(coin_flip_no,instance):
 	for i in instance['all_requests']:
 		if instance['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==True:
 			result.append(i)
-			
-	print "Coeff {0}: Coin flip {1}: Stats: Requests in provider market share w/o Gamma: {2}".format(instance['instance_params']['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL'],coin_flip_no,len(result))
-	# print(result)
 
 	result2 = [x for x in instance['all_requests'] if x not in result]
-	print "Coeff {0}: Coin flip {1}: Stats: Requests NOT in provider market share w/o Gamma: {2}".format(instance['instance_params']['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL'],coin_flip_no,len(result2))
-	# print(result2)
+
+	print "Coeff {0}: Coin flip {1}: Stats: (Provider market share w/o Gamma) requests IN: {2}, OUT: {3}".format(instance['instance_params']['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL'],coin_flip_no,len(result),len(result2))
 
 	# #Requests in provider market initially
 	# result = []
@@ -737,32 +734,59 @@ def get_coin_flip_params(coeff_internal=100):
 	'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL':PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL,
 	'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL': PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL}
 
+#################################################################
+
+def get_coin_flip_params_wo_gamma():
+	
+	PROB_PARAM_MARKET_SHARE = .6#300.0/ALPHA_OP
+
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA = 200
+
+	return {'PROB_PARAM_MARKET_SHARE':PROB_PARAM_MARKET_SHARE,
+	'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA':PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA}
+
+def get_coin_flip_params_w_gamma(coin_flip_params,coeff_internal=100):
+
+	assert coin_flip_params is not None
+
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL = coeff_internal
+
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL = 0.5*PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL
+
+	coin_flip_params.update({
+		'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL':PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL,
+		'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL': PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL})
+	return coin_flip_params
+
+#################################################################
+
+
 # vprof -c cmh -s profit_maximization.py
 if __name__=='__main__':
 
 
 	no_INSTANCES  	= 1
-	COEFF_ARRAY_INTERNAL_COINS = [50,100]#[50,100,150,200] #Depends on scales of beta,gamma and detour sensitivity
-	no_COIN_FLIPS 	= 2
+	COEFF_ARRAY_INTERNAL_COINS = [50,100,150,200] #Depends on scales of beta,gamma and detour sensitivity
+	no_COIN_FLIPS 	= 10
 	do_solve 		= True
 
 	for i in range(no_INSTANCES):
 		print 'Instance {0}: Time : {1}'.format(i,time.ctime())
-		instance_base = generate_base_instance()
+		instance_base = generate_base_instance() #no market assignment yet
+		coin_flip_params_wo_gamma = get_coin_flip_params_wo_gamma()
+		instance_partial = flip_coins_wo_gamma(instance_base,coin_flip_params_wo_gamma) #to keep market share and initial division in market share the same as this stochasticity need not be averaged.
 
 		profits_given_coeffs = {}
 		for coeff_no,coeff_internal in enumerate(COEFF_ARRAY_INTERNAL_COINS):
 
-			coin_flip_params = get_coin_flip_params(coeff_internal)
-
-			instance_partial = flip_coins_wo_gamma(instance_base,coin_flip_params) #to keep market share and initial division in market share the same
-
+			coin_flip_params = get_coin_flip_params_w_gamma(coin_flip_params_wo_gamma,coeff_internal)
+			
 			total_profit_array = numpy.zeros((len(instance_base['instance_params']['GAMMA_ARRAY_ALL']),no_COIN_FLIPS))
 			solution_dict = {}
 			for coin_flip_no in range(no_COIN_FLIPS):
 				instance = flip_coins_w_gamma(instance_partial,coin_flip_params) #only influx from internal and external changes
 				print 'Coeff {2}: Coin flip {0}: Starting corresponding experiment: Time {1}'.format(coin_flip_no,time.ctime(),coeff_internal)
-				get_stats(coin_flip_no,instance)
+				#get_stats(coin_flip_no,instance)
 
 				if do_solve is True:
 					for idx,gamma in enumerate(instance['instance_params']['GAMMA_ARRAY_ALL']):
@@ -775,6 +799,8 @@ if __name__=='__main__':
 												'solution_dict':solution_dict,
 												'coin_flip_params': coin_flip_params,
 												'coeff_internal': coeff_internal}
+
+			print('\n')
 
 	print 'Ending all experiments: The time is :', time.ctime()
 	pickle.dump({'profits_given_coeffs':profits_given_coeffs,'instance_base':instance_base},open('plot_data.pkl','wb'))	
