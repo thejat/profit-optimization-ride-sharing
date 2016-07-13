@@ -24,8 +24,9 @@ def generate_base_instance(NO_OF_REQUESTS_IN_UNIVERSE=100):
 	OUR_CUT_FROM_DRIVER = 0.3
 	ALPHA_OP = MAX_DETOUR_SENSITIVITY/2
 
-	GAMMA_ARRAY = [float("%.3f" % (BETA1**(2*x+1))) for x in range(10,-1,-2)]
-	GAMMA_ARRAY.append(0)
+	# GAMMA_ARRAY = [float("%.3f" % (BETA1**(2*x+1))) for x in range(10,-1,-2)]
+	# GAMMA_ARRAY.append(0)
+	GAMMA_ARRAY = [0,.1,.2,.3,.4]
 	GAMMA_ARRAY = sorted(GAMMA_ARRAY)
 	GAMMA_ARRAY_ALL = ['no_gamma'] 	#redundant array
 	GAMMA_ARRAY_ALL.extend(GAMMA_ARRAY)
@@ -121,7 +122,7 @@ def flip_coins_w_gamma(instance_partial,coin_flip_params):
 	GAMMA_ARRAY  = instance['instance_params']['GAMMA_ARRAY']
 	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL = coin_flip_params['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL']
 	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL = coin_flip_params['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL']
-
+	gamma_offset = coin_flip_params['GAMMA_OFFSET']
 
 	#COIN FLIPS: Intoducing SIR as a function of gamma: Now, both internal (in PROVIDER_MARKET) and external (not in PROVIDER_MARKET) requests change their membership/preference
 	previous_gamma = None
@@ -133,7 +134,7 @@ def flip_coins_w_gamma(instance_partial,coin_flip_params):
 
 			prob_threshold = (1.0/(1+GAMMA_ARRAY[-1]))*\
 				(1-all_requests[i]['our_cut_from_requester'][1])* \
-				(1+current_gamma)/\
+				(gamma_offset+current_gamma)/\
 				all_requests[i]['detour_sensitivity']
 
 			#Splitting the requests in the service provider part further into ride share and non-ride share
@@ -647,9 +648,12 @@ def get_coin_flip_params_w_gamma(coin_flip_params,coeff_internal=100):
 
 	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL = 0.5*PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL
 
+	GAMMA_OFFSET = 0.01
+
 	coin_flip_params.update({
 		'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL':PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL,
-		'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL': PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL})
+		'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL': PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL,
+		'GAMMA_OFFSET': GAMMA_OFFSET})
 	return coin_flip_params
 
 
@@ -658,7 +662,7 @@ if __name__=='__main__':
 
 
 	no_INSTANCES  	= 1
-	COEFF_ARRAY_INTERNAL_COINS = [50,100,150,200] #Depends on scales of beta,gamma and detour sensitivity
+	COEFF_ARRAY_INTERNAL_COINS = [10,100,1000,10000,100000] #Depends on scales of beta,gamma and detour sensitivity
 	no_COIN_FLIPS 	= 10
 	do_solve 		= True
 
@@ -695,4 +699,8 @@ if __name__=='__main__':
 			print('\n')
 
 	print 'Ending all experiments: The time is :', time.ctime()
-	pickle.dump({'profits_given_coeffs':profits_given_coeffs,'instance_base':instance_base},open('plot_data.pkl','wb'))	
+	pickle.dump({'profits_given_coeffs':profits_given_coeffs,\
+		'instance_base':instance_base,
+		'COEFF_ARRAY_INTERNAL_COINS':COEFF_ARRAY_INTERNAL_COINS,
+		'no_COIN_FLIPS':no_COIN_FLIPS},
+		open('../../../plot_data.pkl','wb'))	
