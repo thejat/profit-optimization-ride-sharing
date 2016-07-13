@@ -168,8 +168,8 @@ def flip_coins_wo_gamma(instance_base,coin_flip_params):
 	instance_partial = copy.deepcopy(instance_base)
 
 	#local copy
-	all_requests = instance['all_requests']
-	GAMMA_ARRAY  = instance['instance_params']['GAMMA_ARRAY']
+	all_requests = instance_partial['all_requests']
+	GAMMA_ARRAY  = instance_partial['instance_params']['GAMMA_ARRAY']
 	PROB_PARAM_MARKET_SHARE 					= coin_flip_params['PROB_PARAM_MARKET_SHARE']
 	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA = coin_flip_params['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA']
 
@@ -479,7 +479,7 @@ def get_profit_matched(selected_requests,instance,permutation,experiment_params)
 		return instance_params['ALPHA_OP']*\
 				(sum([all_requests[m]['our_cut_from_requester'][2]*\
 					euclidean(all_requests[m]['orig'],all_requests[m]['dest']) for m in selected_requests]) - \
-				(1-instance_params['OUR_CUT_FROM_DRIVER'])*get_driving_distance(None,selected_requests,permutation,instance))
+				(1 - instance_params['OUR_CUT_FROM_DRIVER'])*get_driving_distance(None,selected_requests,permutation,instance))
 	else:
 
 		result = 0
@@ -492,7 +492,7 @@ def get_profit_matched(selected_requests,instance,permutation,experiment_params)
 			result +=beta2*euclidean(all_requests[m]['orig'],all_requests[m]['dest'])
 
 		return instance_params['ALPHA_OP']*result - \
-			(1-instance_params['OUR_CUT_FROM_DRIVER'])*get_driving_distance(None,selected_requests,permutation,instance)
+			(1 - instance_params['OUR_CUT_FROM_DRIVER'])*get_driving_distance(None,selected_requests,permutation,instance)
 
 def get_incremental_profit(selected_requests,instance,experiment_params):
 
