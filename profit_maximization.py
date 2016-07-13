@@ -76,93 +76,6 @@ def generate_base_instance(NO_OF_REQUESTS_IN_UNIVERSE=100):
 	'GAMMA_ARRAY':GAMMA_ARRAY,
 	'GAMMA_ARRAY_ALL': GAMMA_ARRAY_ALL}}
 
-def flip_coins_for(instance_base,coin_flip_params):
-
-	instance = copy.deepcopy(instance_base)
-
-	#local copy
-	all_requests = instance['all_requests']
-	GAMMA_ARRAY  = instance['instance_params']['GAMMA_ARRAY']
-	PROB_PARAM_MARKET_SHARE 					= coin_flip_params['PROB_PARAM_MARKET_SHARE']
-	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA = coin_flip_params['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA']
-	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL = coin_flip_params['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL']
-	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL = coin_flip_params['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL']
-
-	#COIN FLIPS: Splitting the universe into service provider part and non service provider part
-	for i in all_requests:
-		if random.uniform(0,1) < PROB_PARAM_MARKET_SHARE:
-			all_requests[i]['PROVIDER_MARKET']['no_gamma'] = True
-			for gamma in GAMMA_ARRAY:#redundant
-				all_requests[i]['PROVIDER_MARKET'][gamma] = True
-
-	#COIN FLIPS: No SIR ridesharers in provider's market
-	for i in all_requests:
-		if all_requests[i]['PROVIDER_MARKET']['no_gamma'] == True:
-			prob_threshold = PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA*\
-				(1-all_requests[i]['our_cut_from_requester'][1])/ \
-				all_requests[i]['detour_sensitivity']
-			all_requests[i]['RIDE_SHARING']['no_gamma'] = (random.uniform(0,1) < prob_threshold)
-			if all_requests[i]['RIDE_SHARING']['no_gamma'] == True:
-				for gamma in GAMMA_ARRAY:#redundant
-					all_requests[i]['RIDE_SHARING'][gamma] = True
-
-	#COIN FLIPS: Intoducing SIR as a function of gamma: Now, both internal (in PROVIDER_MARKET) and external (not in PROVIDER_MARKET) requests change their membership/preference
-	previous_gamma = None
-	for idx,current_gamma in enumerate(GAMMA_ARRAY):
-
-		for i in all_requests:
-
-			# print "idx: {0}, i = {1}".format(idx,i)
-
-			prob_threshold = (1.0/(1+GAMMA_ARRAY[-1]))*\
-				(1-all_requests[i]['our_cut_from_requester'][1])* \
-				(1+current_gamma)/\
-				all_requests[i]['detour_sensitivity']
-
-			#Splitting the requests in the service provider part further into ride share and non-ride share
-			if all_requests[i]['PROVIDER_MARKET']['no_gamma'] == True:
-
-				prob_threshold *= PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL
-	
-				if idx == 0:
-					if all_requests[i]['RIDE_SHARING']['no_gamma'] == False:
-						all_requests[i]['RIDE_SHARING'][current_gamma] = (random.uniform(0,1) < prob_threshold)
-					else:
-						all_requests[i]['RIDE_SHARING'][current_gamma] = True
-				elif all_requests[i]['RIDE_SHARING'][previous_gamma] == False: #flip a coin
-					all_requests[i]['RIDE_SHARING'][current_gamma] = (random.uniform(0,1) < prob_threshold)
-				elif all_requests[i]['RIDE_SHARING'][previous_gamma] == True: #copy previous val
-					all_requests[i]['RIDE_SHARING'][current_gamma] = True
-
-
-			#Adding requests not in original market share into the ride sharing pool
-			if all_requests[i]['PROVIDER_MARKET']['no_gamma'] == False:
-
-				prob_threshold *= PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL
-
-				if idx == 0:
-					all_requests[i]['RIDE_SHARING'][current_gamma] = (random.uniform(0,1) < prob_threshold)
-				elif all_requests[i]['RIDE_SHARING'][previous_gamma] == False:
-					all_requests[i]['RIDE_SHARING'][current_gamma] = (random.uniform(0,1) < prob_threshold)
-				elif all_requests[i]['RIDE_SHARING'][previous_gamma] == True:
-					all_requests[i]['RIDE_SHARING'][current_gamma] = True
-				
-				if all_requests[i]['RIDE_SHARING'][current_gamma]==True:
-					all_requests[i]['PROVIDER_MARKET'][current_gamma] = True
-				
-		previous_gamma = current_gamma
-
-
-	instance['instance_params']['PROB_PARAM_MARKET_SHARE'] 	= coin_flip_params['PROB_PARAM_MARKET_SHARE']
-	instance['instance_params']['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA'] = coin_flip_params['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA']
-	instance['instance_params']['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL'] = coin_flip_params['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL']
-	instance['instance_params']['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL'] = coin_flip_params['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL']
-
-	instance['all_requests'] = all_requests
-	return instance
-
-#################################################################
-
 def flip_coins_wo_gamma(instance_base,coin_flip_params):
 
 	instance_partial = copy.deepcopy(instance_base)
@@ -262,8 +175,6 @@ def flip_coins_w_gamma(instance_partial,coin_flip_params):
 
 	instance['all_requests'] = all_requests
 	return instance
-
-#################################################################
 
 def linspace(a, b, n=5):
     if n < 2:
@@ -719,23 +630,6 @@ def get_stats(coin_flip_no,instance):
 	# for i in range(data.shape[0]):
 		# print i,data[i]
 
-def get_coin_flip_params(coeff_internal=100):
-	
-	PROB_PARAM_MARKET_SHARE = .6#300.0/ALPHA_OP
-
-	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA = 200
-
-	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL = coeff_internal
-
-	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL = 0.5*PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL
-
-	return {'PROB_PARAM_MARKET_SHARE':PROB_PARAM_MARKET_SHARE,
-	'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA':PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA,
-	'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL':PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL,
-	'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL': PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL}
-
-#################################################################
-
 def get_coin_flip_params_wo_gamma():
 	
 	PROB_PARAM_MARKET_SHARE = .6#300.0/ALPHA_OP
@@ -757,8 +651,6 @@ def get_coin_flip_params_w_gamma(coin_flip_params,coeff_internal=100):
 		'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL':PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL,
 		'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL': PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL})
 	return coin_flip_params
-
-#################################################################
 
 
 # vprof -c cmh -s profit_maximization.py
