@@ -4,7 +4,7 @@ from profit_maximization import *
 if __name__=='__main__':
 
 
-	COEFF_ARRAY_INTERNAL_COINS = [100,1000] #Depends on scales of beta,gamma and detour sensitivity
+	COEFF_ARRAY_INTERNAL_COINS = [1e6] #Depends on scales of beta,gamma and detour sensitivity
 
 	instance_base = generate_base_instance() #no market assignment yet
 	coin_flip_params_wo_gamma = get_coin_flip_params_wo_gamma()

@@ -109,7 +109,7 @@ def plot_result_probability(data):
 	for label in legend.get_lines():
 		label.set_linewidth(1.5)  # the legend line width
 
-	plt.xscale('log')
+	#plt.xscale('log')
 	plt.xlabel('Probability coefficient')
 	plt.ylabel('Profit')
 	plt.title('Variation of profit with probability of choosing to rideshare')

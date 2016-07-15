@@ -8,7 +8,7 @@ from collections import OrderedDict
 random.seed(5000)  # for replicability of experiments.
 __author__ = 'q4fj4lj9'
 
-def get_instance_params(NO_OF_REQUESTS_IN_UNIVERSE=100):
+def get_instance_params(NO_OF_REQUESTS_IN_UNIVERSE=100,GAMMA_ARRAY=[0,0.1,0.2,0.3,0.4]):
 
 	#requests and service provider details
 	BETA1 = 0.9
@@ -26,8 +26,7 @@ def get_instance_params(NO_OF_REQUESTS_IN_UNIVERSE=100):
 
 	# GAMMA_ARRAY = [float("%.3f" % (BETA1**(2*x+1))) for x in range(10,-1,-2)]
 	# GAMMA_ARRAY.append(0)
-	GAMMA_ARRAY = [0,.1,.2,.3,.4]
-	GAMMA_ARRAY = sorted(GAMMA_ARRAY)
+	GAMMA_ARRAY = sorted(GAMMA_ARRAY) #see default in function arg definition
 	GAMMA_ARRAY_ALL = ['no_gamma'] 	#redundant array
 	GAMMA_ARRAY_ALL.extend(GAMMA_ARRAY)
 
@@ -41,9 +40,7 @@ def get_instance_params(NO_OF_REQUESTS_IN_UNIVERSE=100):
 	'GAMMA_ARRAY':GAMMA_ARRAY,
 	'GAMMA_ARRAY_ALL': GAMMA_ARRAY_ALL}
 
-def generate_base_instance(NO_OF_REQUESTS_IN_UNIVERSE=100):
-
-	instance_params = get_instance_params(NO_OF_REQUESTS_IN_UNIVERSE)
+def generate_base_instance(instance_params):
 
 	GRID_MAX   = 100
 	GRID_MAX_X = GRID_MAX
@@ -537,7 +534,7 @@ def match_requests(instance,experiment_params):
 
 	return result
 
-def get_profit_from_unmatched_requests(selected_requests,instance):
+def get_profit_from_unmatched_requests(selected_requests,instance,experiment_params):
 
 	if selected_requests is None:
 		return 0
@@ -546,11 +543,13 @@ def get_profit_from_unmatched_requests(selected_requests,instance):
 
 	result = 0
 	for i in selected_requests:
-		result += get_profit_unmatched([i],instance)
+		if instance['all_requests'][i]['RIDE_SHARING'][experiment_params['GAMMA']]==True and \
+			instance['all_requests'][i]['PROVIDER_MARKET'][experiment_params['GAMMA']]==True:#if they are in the provider market and ridesharing
+			result += get_profit_unmatched([i],instance)
 
 	return result
 
-def get_profit_from_non_ridesharing_requests(selected_requests,instance):
+def get_profit_from_non_ridesharing_requests(selected_requests,instance,experiment_params):
 
 	if selected_requests is None:
 		return 0
@@ -562,7 +561,8 @@ def get_profit_from_non_ridesharing_requests(selected_requests,instance):
 
 	result = 0
 	for i in selected_requests:
-		result += get_profit_non_ride_sharing([i],instance)
+		if instance['all_requests'][i]['PROVIDER_MARKET'][experiment_params['GAMMA']]==True:#if they are in the provider market
+			result += get_profit_non_ride_sharing([i],instance) #then it counts for the provider
 
 	return result
 
@@ -580,8 +580,8 @@ def solve_instance(coin_flip_no,instance,experiment_params):
 
 	solution = match_requests(instance,experiment_params)
 	total_profit = \
-		get_profit_from_non_ridesharing_requests(solution['non_ridesharing_requests'],instance) + \
-		get_profit_from_unmatched_requests(solution['unmatched_requests'],instance) + \
+		get_profit_from_non_ridesharing_requests(solution['non_ridesharing_requests'],instance,experiment_params) + \
+		get_profit_from_unmatched_requests(solution['unmatched_requests'],instance,experiment_params) + \
 		get_profit_from_matched_requests(solution['matched_request_pairs_with_permutations'],instance,experiment_params)
 
 	print "Coeff {5}: Coin flip {4}: Experiment Gamma = {3}. Total profit: {0}. Size of matching graph: {1}. #Total ridesharers: {2}".format(total_profit,len(solution['matching_graph'].nodes()),len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][experiment_params['GAMMA']]==True]),experiment_params['GAMMA'],coin_flip_no,instance['instance_params']['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL'])
@@ -685,13 +685,18 @@ if __name__=='__main__':
 
 
 	no_INSTANCES  	= 1
-	COEFF_ARRAY_INTERNAL_COINS = [10,100,1000,10000,100000] #Depends on scales of beta,gamma and detour sensitivity
+	COEFF_ARRAY_INTERNAL_COINS = [50,150,250,350,1e3] #Depends on scales of beta,gamma and detour sensitivity
 	no_COIN_FLIPS 	= 10
 	do_solve 		= True
+	GAMMA_ARRAY 	= [0,.1,.3,.5,.7,.9]
+	instance_params = get_instance_params(GAMMA_ARRAY=GAMMA_ARRAY)
+	GAMMA_ARRAY_ALL = instance_params['GAMMA_ARRAY_ALL']
 
+	
 	for i in range(no_INSTANCES):
 		print 'Instance {0}: Time : {1}'.format(i,time.ctime())
-		instance_base = generate_base_instance() #no market assignment yet
+
+		instance_base = generate_base_instance(instance_params) #no market assignment yet
 		coin_flip_params_wo_gamma = get_coin_flip_params_wo_gamma()
 		instance_partial = flip_coins_wo_gamma(instance_base,coin_flip_params_wo_gamma) #to keep market share and initial division in market share the same as this stochasticity need not be averaged.
 
@@ -700,7 +705,7 @@ if __name__=='__main__':
 
 			coin_flip_params = get_coin_flip_params_w_gamma(coin_flip_params_wo_gamma,coeff_internal)
 			
-			total_profit_array = numpy.zeros((len(instance_base['instance_params']['GAMMA_ARRAY_ALL']),no_COIN_FLIPS))
+			total_profit_array = numpy.zeros((len(GAMMA_ARRAY_ALL),no_COIN_FLIPS))
 			solution_dict = {}
 			for coin_flip_no in range(no_COIN_FLIPS):
 				instance = flip_coins_w_gamma(instance_partial,coin_flip_params) #only influx from internal and external changes
@@ -708,7 +713,7 @@ if __name__=='__main__':
 				#get_stats(coin_flip_no,instance)
 
 				if do_solve is True:
-					for idx,gamma in enumerate(instance['instance_params']['GAMMA_ARRAY_ALL']):
+					for idx,gamma in enumerate(GAMMA_ARRAY_ALL):
 						experiment_params = {'DISCOUNT_SETTING':'detour_based','GAMMA':gamma} # 'independent'
 						solution,total_profit = solve_instance(coin_flip_no,instance,experiment_params)
 						total_profit_array[idx,coin_flip_no] = total_profit
