@@ -66,6 +66,12 @@ def generate_base_instance(NO_OF_REQUESTS_IN_UNIVERSE=100):
 		all_requests[i]['RIDE_SHARING']['no_gamma'] = False
 		for gamma in GAMMA_ARRAY:
 			all_requests[i]['RIDE_SHARING'][gamma] = False
+
+		#For Logging purposes: RIDE_SHARING_BIAS key will be a dictionary with gamma as keys
+		all_requests[i]['RIDE_SHARING_BIAS'] = OrderedDict()
+		all_requests[i]['RIDE_SHARING_BIAS']['no_gamma'] = -1 #Convention: NO FLIP means negative value
+		for gamma in GAMMA_ARRAY:
+			all_requests[i]['RIDE_SHARING_BIAS'][gamma] = -1 #Convention: NO FLIP means negative value
 		
 	#Flipping coins is moved to its own function
 
@@ -104,6 +110,8 @@ def flip_coins_wo_gamma(instance_base,coin_flip_params):
 			if all_requests[i]['RIDE_SHARING']['no_gamma'] == True:
 				for gamma in GAMMA_ARRAY:#redundant
 					all_requests[i]['RIDE_SHARING'][gamma] = True
+
+			all_requests[i]['RIDE_SHARING_BIAS']['no_gamma'] = prob_threshold
 
 
 
@@ -152,6 +160,8 @@ def flip_coins_w_gamma(instance_partial,coin_flip_params):
 				elif all_requests[i]['RIDE_SHARING'][previous_gamma] == True: #copy previous val
 					all_requests[i]['RIDE_SHARING'][current_gamma] = True
 
+				#Logging purposes
+				all_requests[i]['RIDE_SHARING_BIAS'][current_gamma] = prob_threshold
 
 			#Adding requests not in original market share into the ride sharing pool
 			if all_requests[i]['PROVIDER_MARKET']['no_gamma'] == False:
@@ -167,7 +177,11 @@ def flip_coins_w_gamma(instance_partial,coin_flip_params):
 				
 				if all_requests[i]['RIDE_SHARING'][current_gamma]==True:
 					all_requests[i]['PROVIDER_MARKET'][current_gamma] = True
-				
+			
+				#Logging purposes
+				all_requests[i]['RIDE_SHARING_BIAS'][current_gamma] = prob_threshold
+
+
 		previous_gamma = current_gamma
 
 
@@ -703,4 +717,4 @@ if __name__=='__main__':
 		'instance_base':instance_base,
 		'COEFF_ARRAY_INTERNAL_COINS':COEFF_ARRAY_INTERNAL_COINS,
 		'no_COIN_FLIPS':no_COIN_FLIPS},
-		open('../../../plot_data.pkl','wb'))	
+		open('../../../Xharecost_MS_annex/plot_data.pkl','wb'))	
