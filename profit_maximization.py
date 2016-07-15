@@ -8,21 +8,21 @@ from collections import OrderedDict
 random.seed(5000)  # for replicability of experiments.
 __author__ = 'q4fj4lj9'
 
-
-def generate_base_instance(NO_OF_REQUESTS_IN_UNIVERSE=100):
+def get_instance_params(NO_OF_REQUESTS_IN_UNIVERSE=100):
 
 	#requests and service provider details
 	BETA1 = 0.9
-	BETA2 = 0.8 #dummy for detour based discounting setting.
-	OUR_CUT_FROM_REQUESTER_COMMON = {1:BETA1,2:BETA2}
+	OUR_CUT_FROM_REQUESTER_COMMON = {1:BETA1,2:0.9*BETA1} #second key:value pair is irrelevant for detour based discount
 	MAX_DETOUR_SENSITIVITY = 100
-
-	GRID_MAX   = 100
-	GRID_MAX_X = GRID_MAX
-	GRID_MAX_Y = GRID_MAX
 
 	OUR_CUT_FROM_DRIVER = 0.3
 	ALPHA_OP = MAX_DETOUR_SENSITIVITY/2
+
+	#permutations needed for two participant matching
+	all_permutations_two = {('si','sj','di','dj'):'case1',
+			('si','sj','dj','di'):'case2',
+			('sj','si','dj','di'):'case1',
+			('sj','si','di','dj'):'case2'}#TODO: make more comprehensible
 
 	# GAMMA_ARRAY = [float("%.3f" % (BETA1**(2*x+1))) for x in range(10,-1,-2)]
 	# GAMMA_ARRAY.append(0)
@@ -31,15 +31,27 @@ def generate_base_instance(NO_OF_REQUESTS_IN_UNIVERSE=100):
 	GAMMA_ARRAY_ALL = ['no_gamma'] 	#redundant array
 	GAMMA_ARRAY_ALL.extend(GAMMA_ARRAY)
 
-	#permutations needed for two participant matching
-	all_permutations_two = {('si','sj','di','dj'):'case1',
-			('si','sj','dj','di'):'case2',
-			('sj','si','dj','di'):'case1',
-			('sj','si','di','dj'):'case2'}#TODO: make more comprehensible
+	return {
+	'NO_OF_REQUESTS_IN_UNIVERSE':NO_OF_REQUESTS_IN_UNIVERSE,
+	'OUR_CUT_FROM_REQUESTER_COMMON':OUR_CUT_FROM_REQUESTER_COMMON,
+	'MAX_DETOUR_SENSITIVITY': MAX_DETOUR_SENSITIVITY,
+	'OUR_CUT_FROM_DRIVER': OUR_CUT_FROM_DRIVER,
+	'ALPHA_OP':ALPHA_OP,
+	'all_permutations_two': all_permutations_two,
+	'GAMMA_ARRAY':GAMMA_ARRAY,
+	'GAMMA_ARRAY_ALL': GAMMA_ARRAY_ALL}
+
+def generate_base_instance(NO_OF_REQUESTS_IN_UNIVERSE=100):
+
+	instance_params = get_instance_params(NO_OF_REQUESTS_IN_UNIVERSE)
+
+	GRID_MAX   = 100
+	GRID_MAX_X = GRID_MAX
+	GRID_MAX_Y = GRID_MAX
 
 	# GENERATE OD locations for all requests
 	all_requests = OrderedDict()
-	for i in range(NO_OF_REQUESTS_IN_UNIVERSE):
+	for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE']):
 		all_requests[i] = OrderedDict()
 
 
@@ -49,39 +61,34 @@ def generate_base_instance(NO_OF_REQUESTS_IN_UNIVERSE=100):
 			all_requests[i]['orig'] = numpy.array([random.randint(0,GRID_MAX_X),random.randint(0,GRID_MAX_Y)])
 			all_requests[i]['dest'] = numpy.array([random.randint(0,GRID_MAX_X),random.randint(0,GRID_MAX_Y)])
 
-		all_requests[i]['detour_sensitivity'] = random.randint(1,MAX_DETOUR_SENSITIVITY)
+		all_requests[i]['detour_sensitivity'] = random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY'])
 
-		all_requests[i]['detour_sensitivity_normalized'] = all_requests[i]['detour_sensitivity']*1.0/ALPHA_OP
+		all_requests[i]['detour_sensitivity_normalized'] = all_requests[i]['detour_sensitivity']*1.0/instance_params['ALPHA_OP']
 
-		all_requests[i]['our_cut_from_requester'] = OUR_CUT_FROM_REQUESTER_COMMON
+		all_requests[i]['our_cut_from_requester'] = instance_params['OUR_CUT_FROM_REQUESTER_COMMON']
 
 		#some default values
 		all_requests[i]['PROVIDER_MARKET'] = OrderedDict()
 		all_requests[i]['PROVIDER_MARKET']['no_gamma'] = False
-		for gamma in GAMMA_ARRAY:
+		for gamma in instance_params['GAMMA_ARRAY']:
 			all_requests[i]['PROVIDER_MARKET'][gamma] = False
 		
 		#RIDE_SHARING key will be a dictionary with gamma as keys
 		all_requests[i]['RIDE_SHARING'] = OrderedDict()
 		all_requests[i]['RIDE_SHARING']['no_gamma'] = False
-		for gamma in GAMMA_ARRAY:
+		for gamma in instance_params['GAMMA_ARRAY']:
 			all_requests[i]['RIDE_SHARING'][gamma] = False
 
 		#For Logging purposes: RIDE_SHARING_BIAS key will be a dictionary with gamma as keys
 		all_requests[i]['RIDE_SHARING_BIAS'] = OrderedDict()
 		all_requests[i]['RIDE_SHARING_BIAS']['no_gamma'] = -1 #Convention: NO FLIP means negative value
-		for gamma in GAMMA_ARRAY:
+		for gamma in instance_params['GAMMA_ARRAY']:
 			all_requests[i]['RIDE_SHARING_BIAS'][gamma] = -1 #Convention: NO FLIP means negative value
 		
 	#Flipping coins is moved to its own function
 
 	return {'all_requests': all_requests,
-	'instance_params':{
-	'OUR_CUT_FROM_DRIVER': OUR_CUT_FROM_DRIVER,
-	'ALPHA_OP':ALPHA_OP,
-	'all_permutations_two': all_permutations_two,
-	'GAMMA_ARRAY':GAMMA_ARRAY,
-	'GAMMA_ARRAY_ALL': GAMMA_ARRAY_ALL}}
+	'instance_params':instance_params}
 
 def flip_coins_wo_gamma(instance_base,coin_flip_params):
 
@@ -406,19 +413,21 @@ def get_profit_matched(selected_requests,instance,permutation,experiment_params)
 				(sum([all_requests[m]['our_cut_from_requester'][2]*\
 					euclidean(all_requests[m]['orig'],all_requests[m]['dest']) for m in selected_requests]) - \
 				(1 - instance_params['OUR_CUT_FROM_DRIVER'])*get_driving_distance(None,selected_requests,permutation,instance))
-	else:
+	elif experiment_params['DISCOUNT_SETTING']=='detour_based':
 
 		result = 0
 		for m in selected_requests:
-			beta2 = all_requests[m]['our_cut_from_requester'][1]
-			beta2 *= (1 - (get_driving_distance(m,selected_requests,permutation,instance) - \
+			beta2 = all_requests[m]['our_cut_from_requester'][1]* \
+				(1 - (get_driving_distance(m,selected_requests,permutation,instance) - \
 				euclidean(all_requests[m]['orig'],all_requests[m]['dest']))*\
 				1.0/euclidean(all_requests[m]['orig'],all_requests[m]['dest']))
 
-			result +=beta2*euclidean(all_requests[m]['orig'],all_requests[m]['dest'])
+			result +=instance_params['ALPHA_OP']*beta2*euclidean(all_requests[m]['orig'],all_requests[m]['dest'])
 
-		return instance_params['ALPHA_OP']*result - \
-			(1 - instance_params['OUR_CUT_FROM_DRIVER'])*get_driving_distance(None,selected_requests,permutation,instance)
+		return result - \
+			instance_params['ALPHA_OP']*(1 - instance_params['OUR_CUT_FROM_DRIVER'])*get_driving_distance(None,selected_requests,permutation,instance)
+	else:
+		return NotImplementedError
 
 def get_incremental_profit(selected_requests,instance,experiment_params):
 
