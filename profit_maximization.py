@@ -195,12 +195,6 @@ def flip_coins_w_gamma(instance_partial,coin_flip_params):
 	instance['all_requests'] = all_requests
 	return instance
 
-def linspace(a, b, n=5):
-    if n < 2:
-        return b
-    diff = (float(b) - a)/(n - 1)
-    return [diff * i + a  for i in range(n)]
-
 def euclidean(x,y):
 	assert x is not None and y is not None
 	return numpy.linalg.norm(x - y)
@@ -426,6 +420,7 @@ def get_profit_matched(selected_requests,instance,permutation,experiment_params)
 	else:
 		return NotImplementedError
 
+#to retain the edge between two requests for two request case
 def get_incremental_profit(selected_requests,instance,experiment_params):
 
 	'''
@@ -471,6 +466,7 @@ def get_incremental_profit(selected_requests,instance,experiment_params):
 		max_profit -= get_profit_unmatched([i],instance)
 	return [max_profit,max_profit_permutation]
 
+#helper
 def is_interested_in_ridesharing(i,instance,experiment_params):
 	GAMMA = experiment_params['GAMMA']
 	if instance['all_requests'][i]['PROVIDER_MARKET'][GAMMA]==True:#maybe redundant
@@ -478,6 +474,7 @@ def is_interested_in_ridesharing(i,instance,experiment_params):
 			return True
 	return False #default
 
+#edmonds
 def match_requests(instance,experiment_params):
 
 	H = nx.Graph()
@@ -576,6 +573,7 @@ def get_profit_from_matched_requests(matched_request_pairs_with_permutations,ins
 		result += get_profit_matched(request_pairs,instance,matched_request_pairs_with_permutations[request_pairs],experiment_params)
 	return result
 
+#solves the allocation for ride sharing part (profit from matched and unmatched) in the market as well as profits from non ridehsharing requests
 def solve_instance(coin_flip_no,instance,experiment_params):
 
 	solution = match_requests(instance,experiment_params)
@@ -587,6 +585,7 @@ def solve_instance(coin_flip_no,instance,experiment_params):
 	print "Coeff {5}: Coin flip {4}: Experiment Gamma = {3}. Total profit: {0}. Size of matching graph: {1}. #Total ridesharers: {2}".format(total_profit,len(solution['matching_graph'].nodes()),len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][experiment_params['GAMMA']]==True]),experiment_params['GAMMA'],coin_flip_no,instance['instance_params']['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL'])
 	return solution,total_profit
 
+#helper
 def get_stats(coin_flip_no,instance):
 	#simple helper function to display
 	all_gammas = instance['instance_params']['GAMMA_ARRAY_ALL']
@@ -654,6 +653,7 @@ def get_stats(coin_flip_no,instance):
 	# for i in range(data.shape[0]):
 		# print i,data[i]
 
+#gets coin flip parameters related to initial market and initial ridesharers
 def get_coin_flip_params_wo_gamma():
 	
 	PROB_PARAM_MARKET_SHARE = .6#300.0/ALPHA_OP
@@ -663,6 +663,7 @@ def get_coin_flip_params_wo_gamma():
 	return {'PROB_PARAM_MARKET_SHARE':PROB_PARAM_MARKET_SHARE,
 	'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA':PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA}
 
+#generates coin flip parameters for population not initially rideshairng.
 def get_coin_flip_params_w_gamma(coin_flip_params,coeff_internal=100):
 
 	assert coin_flip_params is not None
