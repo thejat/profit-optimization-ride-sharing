@@ -674,7 +674,7 @@ def get_people_counts(coin_flip_no,instance,experiment_params):
 			# 'additional_people': len(total_people) - len(initial_people),
 			# 'additional_people_percent': 1.0*(len(total_people) - len(initial_people))/len(total_people)}
 	output = (len(total_people),len(total_people) - len(initial_people),
-		1.0*(len(total_people) - len(initial_people))/len(total_people))
+		1.0*(len(total_people) - len(initial_people))/len(initial_people))
 	# print output
 	return output
 
