@@ -63,7 +63,7 @@ def get_instance_params(NO_OF_REQUESTS_IN_UNIVERSE=100,GAMMA_ARRAY=[0,0.1,0.2,0.
 	'GAMMA_ARRAY_ALL': GAMMA_ARRAY_ALL,
 	'flag_nyc_data':flag_nyc_data}
 
-def generate_base_instance(instance_params,flag_nyc_data=False,instance_no=0):
+def generate_base_instance(instance_params,flag_nyc_data=False,instance_no=0,nyc_df=None):
 
 	if instance_params['flag_nyc_data']==False:
 		GRID_MAX   = 100
@@ -71,7 +71,7 @@ def generate_base_instance(instance_params,flag_nyc_data=False,instance_no=0):
 		GRID_MAX_Y = GRID_MAX
 	else:
 		odPatterns = get_nyc_data(nyc_df,instance_no)
-		NO_OF_REQUESTS_IN_UNIVERSE = len(odPatterns)
+		instance_params['NO_OF_REQUESTS_IN_UNIVERSE'] = len(odPatterns)
 
 	# GENERATE OD locations for all requests
 	all_requests = OrderedDict()
@@ -744,15 +744,10 @@ def get_coin_flip_biases(GAMMA_ARRAY,instance):
 def get_people_counts(coin_flip_no,instance,experiment_params):
 	experiment_params0 = copy.deepcopy(experiment_params)
 	experiment_params0['GAMMA'] = 'no_gamma'
-	initial_people = [x for x in instance['all_requests'] if is_interested_in_ridesharing(x,instance,experiment_params0)==True]
-	# print 'initial people',len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][experiment_params0['GAMMA']]==True])
+	initial_people = [x for x in instance['all_requests'] if instance['all_requests'][x]['PROVIDER_MARKET']['no_gamma']==True]
 	
-	total_people = [x for x in instance['all_requests'] if is_interested_in_ridesharing(x,instance,experiment_params)==True]
-	# print 'total people',len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][experiment_params['GAMMA']]==True])
+	total_people = [x for x in instance['all_requests'] if instance['all_requests'][x]['PROVIDER_MARKET'][experiment_params['GAMMA']]==True]
 
-	# return {'total_people':len(initial_people),
-			# 'additional_people': len(total_people) - len(initial_people),
-			# 'additional_people_percent': 1.0*(len(total_people) - len(initial_people))/len(total_people)}
 	output = (len(total_people),len(total_people) - len(initial_people),
 		1.0*(len(total_people) - len(initial_people))/len(initial_people))
 	# print output
@@ -792,11 +787,11 @@ if __name__=='__main__':
 
 	flag_nyc_data 	= True
 	no_INSTANCES  	= 1
-	COEFF_ARRAY_INTERNAL_COINS = [50,150,250,350,1e3] #[150,250] # 
+	COEFF_ARRAY_INTERNAL_COINS = [300,400,500,600,700,1e3] #[150,250] # 
 	#Above depends on scales of beta,gamma and detour sensitivity
-	no_COIN_FLIPS 	= 100 #10 #
+	no_COIN_FLIPS 	= 10 #100 #
 	do_solve 		= True
-	GAMMA_ARRAY 	= [0,.1,.3,.5,.7,.9] #[.3,.6]#
+	GAMMA_ARRAY 	= [0.05,.1,.3,.5,.7,.9] #[.3,.6]#
 	instance_params = get_instance_params(GAMMA_ARRAY=GAMMA_ARRAY,flag_nyc_data=flag_nyc_data)
 	GAMMA_ARRAY_ALL = instance_params['GAMMA_ARRAY_ALL']
 	flag_dump_data  = True
@@ -804,11 +799,13 @@ if __name__=='__main__':
 	# Read NYC data from disk
 	if flag_nyc_data==True:
 		nyc_df = load_nyc_data()
+	else:
+		nyc_df = None
 
 	for instance_no in range(no_INSTANCES):
 		print 'Instance {0}: Time : {1}'.format(instance_no,time.ctime())
 
-		instance_base = generate_base_instance(instance_params,flag_nyc_data,instance_no) #no market assignment yet
+		instance_base = generate_base_instance(instance_params,flag_nyc_data,instance_no,nyc_df) #no market assignment yet
 		coin_flip_params_wo_gamma = get_coin_flip_params_wo_gamma()
 		instance_partial = flip_coins_wo_gamma(instance_base,coin_flip_params_wo_gamma) #to keep market share and initial division in market share the same as this stochasticity need not be averaged.
 
@@ -819,7 +816,7 @@ if __name__=='__main__':
 
 			coin_flip_params = get_coin_flip_params_w_gamma(coin_flip_params_wo_gamma,coeff_internal)
 
-
+			instance_dict = {}
 			solution_dict = {}
 			total_profit_array 							= numpy.zeros((len(GAMMA_ARRAY_ALL),no_COIN_FLIPS))
 			people_count_dict = {}
@@ -841,6 +838,7 @@ if __name__=='__main__':
 						(people_count_dict['total_people'][idx,coin_flip_no],\
 						people_count_dict['additional_people'][idx,coin_flip_no],\
 						people_count_dict['additional_people_pct'][idx,coin_flip_no]) = get_people_counts(coin_flip_no,instance,experiment_params)
+						instance_dict[(idx,coin_flip_no)] = instance
 			
 			#Logging
 			coin_flip_params_dict[coeff_no] = coin_flip_params #logging purposes		
@@ -848,7 +846,8 @@ if __name__=='__main__':
 			profits_given_coeffs[coeff_no] = \
 				{'total_profit_array'	: total_profit_array,
 				 'solution_dict'		: solution_dict,
-				 'people_count_dict'	: people_count_dict}
+				 'people_count_dict'	: people_count_dict,
+				 'instance_dict'		:instance_dict}
 
 			print('\n')
 

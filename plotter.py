@@ -166,11 +166,6 @@ def plot_OD_ridesharing(solution,instance):
 	        ax.plot([data[p]['orig'][0],data[q]['orig'][0],data[q]['dest'][0],data[p]['dest'][0]],\
 	                [data[p]['orig'][1],data[q]['orig'][1],data[q]['dest'][1],data[p]['dest'][1]],linewidth=6)
 
-	        
-	            
-
-	            
-
 	plt.xlabel('X coordinate')
 	plt.ylabel('Y coordinate')
 	plt.title('OD Spatial Plot')
