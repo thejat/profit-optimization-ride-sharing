@@ -802,7 +802,7 @@ if __name__=='__main__':
 	else:
 		nyc_df = None
 
-	for instance_no in range(no_INSTANCES):
+	for instance_no in [42]:#range(no_INSTANCES):
 		print 'Instance {0}: Time : {1}'.format(instance_no,time.ctime())
 
 		instance_base = generate_base_instance(instance_params,flag_nyc_data,instance_no,nyc_df) #no market assignment yet

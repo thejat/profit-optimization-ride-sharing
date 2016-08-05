@@ -34,6 +34,7 @@ def plot_result_single(data_matrix,xticklabels):
 	plt.ylim((.9*min(ys),1.2*max(ys)))
 	plt.show()
 
+#plot profit as a function of gamma
 def plot_result_gamma(data):
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
@@ -79,6 +80,7 @@ def plot_result_gamma(data):
 	#plt.ylim((.9*min(ys),1.2*max(ys)))
 	plt.show()	
 
+#plot profit as a function of probability coefficient
 def plot_result_probability(data):
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
@@ -114,6 +116,62 @@ def plot_result_probability(data):
 	plt.ylabel('Profit')
 	plt.title('Variation of profit with probability of choosing to rideshare')
 	plt.show()
+
+
+def plot_probability_gamma(data):
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+
+	COEFF_ARRAY_INTERNAL_COINS = data['COEFF_ARRAY_INTERNAL_COINS']
+	coin_flip_params_dict = data['coin_flip_params_dict']
+	profits_given_coeffs = data['profits_given_coeffs']
+	no_COIN_FLIPS = data['no_COIN_FLIPS']
+	instance_base = data['instance_base']
+	coin_flip_biases_dict = data['coin_flip_biases_dict']
+	coeff_indices = [x for x in data['profits_given_coeffs']]
+	xticklabels = data['instance_base']['instance_params']['GAMMA_ARRAY']
+
+	output = numpy.zeros((len(COEFF_ARRAY_INTERNAL_COINS),len(instance_base['instance_params']['GAMMA_ARRAY'])))
+	output_std = numpy.zeros((len(COEFF_ARRAY_INTERNAL_COINS),len(instance_base['instance_params']['GAMMA_ARRAY'])))
+	for coeff_no,coeff_internal in enumerate(COEFF_ARRAY_INTERNAL_COINS):
+	    for idx,gamma in enumerate(instance_base['instance_params']['GAMMA_ARRAY']):
+	        temp_meta = []
+	        for coin_flip_no in range(no_COIN_FLIPS):
+	            temp = []
+	            for i in instance_base['all_requests']:
+	                #CONDITIONING ON BEING OUTSIDE MARKETSHARE
+	                if profits_given_coeffs[coeff_no]['instance_dict'][(idx,coin_flip_no)]['all_requests'][i]['PROVIDER_MARKET']['no_gamma']==False:
+	                    temp.append(coin_flip_biases_dict[coeff_no][idx,i])
+	            temp_meta.append(numpy.median(numpy.asarray(temp)))
+	        output[coeff_no,idx] = numpy.median(numpy.asarray(temp_meta))
+	        output_std[coeff_no,idx] = numpy.std(numpy.asarray(temp_meta))/math.sqrt(len(temp_meta))
+	print output
+
+	for coeff_index in coeff_indices:
+		
+		temp_avg = output[coeff_index,:]
+		#print temp_avg
+		temp_std = output_std[coeff_index,:]
+
+		xs 		= xticklabels
+		ys 		= temp_avg #exclude no_gamma
+		ys_std 	= temp_std #exclude no_gamma
+
+		ax.fill_between(xs, ys-ys_std, ys+ys_std, alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
+		ax.plot(xs, ys,label=data['COEFF_ARRAY_INTERNAL_COINS'][coeff_index])
+
+	legend = ax.legend(loc='best', shadow=True)
+	frame = legend.get_frame()
+	frame.set_facecolor('0.90')
+	# Set the fontsize
+	for label in legend.get_texts():
+		label.set_fontsize('large')
+	for label in legend.get_lines():
+		label.set_linewidth(1.5)  # the legend line width
+	plt.xlabel('Gamma')
+	plt.ylabel('Probability')
+	plt.title('Probability of Conversion (outside provider\'s market)')
+	plt.show()	
 
 #needs a single experiment solution and its corresponding instance. Will plot the OD and the rideshares that happen
 def plot_OD_ridesharing(solution,instance):
