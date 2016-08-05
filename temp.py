@@ -1,5 +1,4 @@
 #TODO:
-replace ['RIDE_SHARING'] with ['RIDE_SHARING'][0] 
 
 
 #######################################################################
@@ -15,6 +14,7 @@ plt.scatter(x, y, s=80, c=range(len(instance['all_requests'])), marker="o")
 
 plt.show()
 
+#######################################################################
 
 import matplotlib.pyplot as plt
 

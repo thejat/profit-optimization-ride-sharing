@@ -114,3 +114,64 @@ def plot_result_probability(data):
 	plt.ylabel('Profit')
 	plt.title('Variation of profit with probability of choosing to rideshare')
 	plt.show()
+
+
+def plot_OD_ridesharing(solution,instance):
+	plot_rs_matched = True
+	if plot_rs_matched == True:
+	    temp_request_set = set()
+	    for k in solution['matched_request_pairs_with_permutations']:
+	        temp_request_set.add(k[0])
+	        temp_request_set.add(k[1])
+	    data = {x:instance['all_requests'][x] for x in temp_request_set}
+	else:        
+	    data = {x:instance['all_requests'][x] for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][experiment_params['GAMMA']]==True}
+
+	N = len(data)
+	labels = ['{0}'.format(i) for i in data]
+
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+
+	pd = {'orig':'green','dest':'red'}
+	for loc in pd:
+	    x = [data[z][loc][0] for z in data]
+	    y = [data[z][loc][1] for z in data]
+
+	#     plt.scatter(x, y, s=80, c=pd[loc], marker="o")
+
+	    ax.scatter(x, y, marker = 'o', 
+	        c = pd[loc], s = 1500,
+	        cmap = plt.get_cmap('Spectral'))
+	    for label, x, y in zip(labels, x, y):
+	        ax.annotate(
+	            label+','+loc, 
+	            xy = (x, y), xytext = (-20, 20),
+	            textcoords = 'offset points', ha = 'right', va = 'bottom',
+	            bbox = dict(boxstyle = 'round,pad=0.5', fc = 'yellow', alpha = 0.5),
+	            arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
+
+	data_matched = solution['matched_request_pairs_with_permutations']
+	for p,q in data_matched:
+	    if instance['instance_params']['all_permutations_two'][data_matched[(p,q)]]=='case1':
+	        print "case1: {0},{1}:{2}".format(p,q,data_matched[(p,q)])
+	        if data_matched[(p,q)][0] == 'sj':
+	            (p,q) = (q,p)
+	        ax.plot([data[p]['orig'][0],data[q]['orig'][0],data[p]['dest'][0],data[q]['dest'][0]],\
+	                [data[p]['orig'][1],data[q]['orig'][1],data[p]['dest'][1],data[q]['dest'][1]],linewidth=6)
+	    elif instance['instance_params']['all_permutations_two'][data_matched[(p,q)]]=='case2':
+	        print "case2: {0},{1}:{2}".format(p,q,data_matched[(p,q)])
+	        if data_matched[(p,q)][0] == 'sj':
+	            (p,q) = (q,p)
+	        ax.plot([data[p]['orig'][0],data[q]['orig'][0],data[q]['dest'][0],data[p]['dest'][0]],\
+	                [data[p]['orig'][1],data[q]['orig'][1],data[q]['dest'][1],data[p]['dest'][1]],linewidth=6)
+
+	        
+	            
+
+	            
+
+	plt.xlabel('X coordinate')
+	plt.ylabel('Y coordinate')
+	plt.title('OD Spatial Plot')
+	plt.show()
