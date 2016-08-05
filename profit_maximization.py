@@ -701,11 +701,14 @@ if __name__=='__main__':
 		coin_flip_params_wo_gamma = get_coin_flip_params_wo_gamma()
 		instance_partial = flip_coins_wo_gamma(instance_base,coin_flip_params_wo_gamma) #to keep market share and initial division in market share the same as this stochasticity need not be averaged.
 
-		profits_given_coeffs = {}
+		profits_given_coeffs = {} #logging purposes
+		coin_flip_params_dict = {} #logging purposes
+		coin_flip_biases_dict = {} #logging purposes
 		for coeff_no,coeff_internal in enumerate(COEFF_ARRAY_INTERNAL_COINS):
 
 			coin_flip_params = get_coin_flip_params_w_gamma(coin_flip_params_wo_gamma,coeff_internal)
-			
+			coin_flip_params_dict[coeff_internal] = coin_flip_params #logging purposes
+
 			total_profit_array = numpy.zeros((len(GAMMA_ARRAY_ALL),no_COIN_FLIPS))
 			solution_dict = {}
 			for coin_flip_no in range(no_COIN_FLIPS):
@@ -720,6 +723,15 @@ if __name__=='__main__':
 						total_profit_array[idx,coin_flip_no] = total_profit
 						solution_dict[(idx,coin_flip_no)] = solution
 			
+				#logging purposes only
+				if coin_flip_no==no_COIN_FLIPS-1: #the last realization, since realizations don't matter for this log
+			
+		    		coin_flip_biases = numpy.zeros((len(GAMMA_ARRAY),len(instance['all_requests'])))
+    				for idx,gamma in enumerate(GAMMA_ARRAY):
+        				coin_flip_biases[idx] = numpy.asarray([instance['all_requests'][x]['RIDE_SHARING_BIAS'][gamma] for x in instance['all_requests']])
+    				coin_flip_biases_dict[coeff_internal] = coin_flip_biases
+
+
 			profits_given_coeffs[coeff_no] = {'total_profit_array': total_profit_array,
 												'solution_dict':solution_dict,
 												'coin_flip_params': coin_flip_params,
@@ -728,8 +740,11 @@ if __name__=='__main__':
 			print('\n')
 
 	print 'Ending all experiments: The time is :', time.ctime()
+
 	pickle.dump({'profits_given_coeffs':profits_given_coeffs,\
 		'instance_base':instance_base,
 		'COEFF_ARRAY_INTERNAL_COINS':COEFF_ARRAY_INTERNAL_COINS,
-		'no_COIN_FLIPS':no_COIN_FLIPS},
+		'no_COIN_FLIPS':no_COIN_FLIPS,
+		'coin_flip_biases_dict':coin_flip_biases_dict,
+		'coin_flip_params_dict':coin_flip_params_dict},
 		open('../../../Xharecost_MS_annex/plot_data.pkl','wb'))	

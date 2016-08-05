@@ -5,7 +5,6 @@
 
 import matplotlib.pyplot as plt
 
-
 x = [instance['all_requests'][z]['orig'][0] for z in instance['all_requests']]
 y = [instance['all_requests'][z]['orig'][1] for z in instance['all_requests']]
 
