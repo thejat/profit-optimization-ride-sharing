@@ -1,5 +1,12 @@
 #TODO:
 
+#Compute coin flip parameter values for each gamma and coefficient value
+pickle.dump({'instances':instances,\
+		'COEFF_ARRAY_INTERNAL_COINS':COEFF_ARRAY_INTERNAL_COINS,
+		'coin_flip_params_dict':coin_flip_params_dict},
+		'all_biases':all_biases,
+		'GAMMA_ARRAY':GAMMA_ARRAY,
+		open('../../../Xharecost_MS_annex/bias_data.pkl','wb'))
 
 #######################################################################
 

@@ -653,6 +653,31 @@ def get_stats(coin_flip_no,instance):
 	# for i in range(data.shape[0]):
 		# print i,data[i]
 
+#helper
+def get_coin_flip_biases(GAMMA_ARRAY,instance):
+	coin_flip_biases = numpy.zeros((len(GAMMA_ARRAY),len(instance['all_requests'])))
+	for idx,gamma in enumerate(GAMMA_ARRAY):
+		coin_flip_biases[idx] = numpy.asarray([instance['all_requests'][x]['RIDE_SHARING_BIAS'][gamma] for x in instance['all_requests']])
+	return coin_flip_biases
+
+#helper: given a gamma and a realization of coin flips caused by a given coin flip param
+def get_people_counts(coin_flip_no,instance,experiment_params):
+	experiment_params0 = copy.deepcopy(experiment_params)
+	experiment_params0['GAMMA'] = 'no_gamma'
+	initial_people = [x for x in instance['all_requests'] if is_interested_in_ridesharing(x,instance,experiment_params0)==True]
+	# print 'initial people',len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][experiment_params0['GAMMA']]==True])
+	
+	total_people = [x for x in instance['all_requests'] if is_interested_in_ridesharing(x,instance,experiment_params)==True]
+	# print 'total people',len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][experiment_params['GAMMA']]==True])
+
+	# return {'total_people':len(initial_people),
+			# 'additional_people': len(total_people) - len(initial_people),
+			# 'additional_people_percent': 1.0*(len(total_people) - len(initial_people))/len(total_people)}
+	output = (len(total_people),len(total_people) - len(initial_people),
+		1.0*(len(total_people) - len(initial_people))/len(total_people))
+	# print output
+	return output
+
 #gets coin flip parameters related to initial market and initial ridesharers
 def get_coin_flip_params_wo_gamma():
 	
@@ -701,16 +726,20 @@ if __name__=='__main__':
 		coin_flip_params_wo_gamma = get_coin_flip_params_wo_gamma()
 		instance_partial = flip_coins_wo_gamma(instance_base,coin_flip_params_wo_gamma) #to keep market share and initial division in market share the same as this stochasticity need not be averaged.
 
-		profits_given_coeffs = {} #logging purposes
+		profits_given_coeffs  = {} #logging purposes
 		coin_flip_params_dict = {} #logging purposes
 		coin_flip_biases_dict = {} #logging purposes
 		for coeff_no,coeff_internal in enumerate(COEFF_ARRAY_INTERNAL_COINS):
 
 			coin_flip_params = get_coin_flip_params_w_gamma(coin_flip_params_wo_gamma,coeff_internal)
-			coin_flip_params_dict[coeff_internal] = coin_flip_params #logging purposes
 
-			total_profit_array = numpy.zeros((len(GAMMA_ARRAY_ALL),no_COIN_FLIPS))
+
 			solution_dict = {}
+			total_profit_array 							= numpy.zeros((len(GAMMA_ARRAY_ALL),no_COIN_FLIPS))
+			people_count_dict = {}
+			people_count_dict['total_people'] 			= numpy.zeros((len(GAMMA_ARRAY_ALL),no_COIN_FLIPS))
+			people_count_dict['additional_people'] 		= numpy.zeros((len(GAMMA_ARRAY_ALL),no_COIN_FLIPS))
+			people_count_dict['additional_people_pct'] 	= numpy.zeros((len(GAMMA_ARRAY_ALL),no_COIN_FLIPS))
 			for coin_flip_no in range(no_COIN_FLIPS):
 				instance = flip_coins_w_gamma(instance_partial,coin_flip_params) #only influx from internal and external changes
 				print 'Coeff {2}: Coin flip {0}: Starting corresponding experiment: Time {1}'.format(coin_flip_no,time.ctime(),coeff_internal)
@@ -720,31 +749,31 @@ if __name__=='__main__':
 					for idx,gamma in enumerate(GAMMA_ARRAY_ALL):
 						experiment_params = {'DISCOUNT_SETTING':'detour_based','GAMMA':gamma} # 'independent'
 						solution,total_profit = solve_instance(coin_flip_no,instance,experiment_params)
+						#Logging
 						total_profit_array[idx,coin_flip_no] = total_profit
 						solution_dict[(idx,coin_flip_no)] = solution
+						(people_count_dict['total_people'][idx,coin_flip_no],\
+						people_count_dict['additional_people'][idx,coin_flip_no],\
+						people_count_dict['additional_people_pct'][idx,coin_flip_no]) = get_people_counts(coin_flip_no,instance,experiment_params)
 			
-				#logging purposes only
-				if coin_flip_no==no_COIN_FLIPS-1: #the last realization, since realizations don't matter for this log
-			
-		    		coin_flip_biases = numpy.zeros((len(GAMMA_ARRAY),len(instance['all_requests'])))
-    				for idx,gamma in enumerate(GAMMA_ARRAY):
-        				coin_flip_biases[idx] = numpy.asarray([instance['all_requests'][x]['RIDE_SHARING_BIAS'][gamma] for x in instance['all_requests']])
-    				coin_flip_biases_dict[coeff_internal] = coin_flip_biases
-
-
-			profits_given_coeffs[coeff_no] = {'total_profit_array': total_profit_array,
-												'solution_dict':solution_dict,
-												'coin_flip_params': coin_flip_params,
-												'coeff_internal': coeff_internal}
+			#Logging
+			coin_flip_params_dict[coeff_no] = coin_flip_params #logging purposes		
+			coin_flip_biases_dict[coeff_no] = get_coin_flip_biases(GAMMA_ARRAY,instance) #note we assume the last coin flip instance is available outside the no_COIN_FLIPS loop
+			profits_given_coeffs[coeff_no] = \
+				{'total_profit_array'	: total_profit_array,
+				 'solution_dict'		: solution_dict,
+				 'people_count_dict'	: people_count_dict}
 
 			print('\n')
 
 	print 'Ending all experiments: The time is :', time.ctime()
 
-	pickle.dump({'profits_given_coeffs':profits_given_coeffs,\
+	pickle.dump(
+		{'profits_given_coeffs':profits_given_coeffs,
 		'instance_base':instance_base,
 		'COEFF_ARRAY_INTERNAL_COINS':COEFF_ARRAY_INTERNAL_COINS,
 		'no_COIN_FLIPS':no_COIN_FLIPS,
 		'coin_flip_biases_dict':coin_flip_biases_dict,
 		'coin_flip_params_dict':coin_flip_params_dict},
-		open('../../../Xharecost_MS_annex/plot_data.pkl','wb'))	
+		open('../../../Xharecost_MS_annex/plot_data.pkl','wb')
+		)	
