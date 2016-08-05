@@ -1,5 +1,6 @@
 import random, time, math, copy, numpy, pickle
 import networkx as nx
+import pandas
 from pprint import pprint
 from collections import OrderedDict
 # import  matplotlib
@@ -8,7 +9,28 @@ from collections import OrderedDict
 random.seed(5000)  # for replicability of experiments.
 __author__ = 'q4fj4lj9'
 
-def get_instance_params(NO_OF_REQUESTS_IN_UNIVERSE=100,GAMMA_ARRAY=[0,0.1,0.2,0.3,0.4]):
+
+def load_nyc_data():
+	df0 = pandas.read_csv('../../../Xharecost_MS_annex/hour9.csv',usecols= ['pickup_datetime','passenger_count','pickup_longitude','pickup_latitude','dropoff_longitude','dropoff_latitude'])
+
+	nyc_df = df0[(abs(df0.pickup_latitude-0) > 1e-5) & \
+         (abs(df0.pickup_longitude-0) > 1e-5) & \
+         (abs(df0.dropoff_latitude-0) > 1e-5) & \
+         (abs(df0.dropoff_longitude-0) > 1e-5)]
+	nyc_df['pickup_datetime'] = pandas.to_datetime(nyc_df['pickup_datetime'])
+	return nyc_df
+
+def get_nyc_data(nyc_df,instance_no=0):
+	
+	assert instance_no >=0 and instance_no <= 60
+	assert type(instance_no) is int
+
+	data = nyc_df[(nyc_df['pickup_datetime'].dt.minute >= instance_no) & \
+					(nyc_df['pickup_datetime'].dt.minute < instance_no+1)]
+	print 'NYC instance for minute: {0} count of requests: {1}'.format(instance_no,len(data))
+	return data
+
+def get_instance_params(NO_OF_REQUESTS_IN_UNIVERSE=100,GAMMA_ARRAY=[0,0.1,0.2,0.3,0.4],flag_nyc_data=False):
 
 	#requests and service provider details
 	BETA1 = 0.9
@@ -38,25 +60,34 @@ def get_instance_params(NO_OF_REQUESTS_IN_UNIVERSE=100,GAMMA_ARRAY=[0,0.1,0.2,0.
 	'ALPHA_OP':ALPHA_OP,
 	'all_permutations_two': all_permutations_two,
 	'GAMMA_ARRAY':GAMMA_ARRAY,
-	'GAMMA_ARRAY_ALL': GAMMA_ARRAY_ALL}
+	'GAMMA_ARRAY_ALL': GAMMA_ARRAY_ALL,
+	'flag_nyc_data':flag_nyc_data}
 
-def generate_base_instance(instance_params):
+def generate_base_instance(instance_params,flag_nyc_data=False,instance_no=0):
 
-	GRID_MAX   = 100
-	GRID_MAX_X = GRID_MAX
-	GRID_MAX_Y = GRID_MAX
+	if instance_params['flag_nyc_data']==False:
+		GRID_MAX   = 100
+		GRID_MAX_X = GRID_MAX
+		GRID_MAX_Y = GRID_MAX
+	else:
+		odPatterns = get_nyc_data(nyc_df,instance_no)
+		NO_OF_REQUESTS_IN_UNIVERSE = len(odPatterns)
 
 	# GENERATE OD locations for all requests
 	all_requests = OrderedDict()
 	for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE']):
 		all_requests[i] = OrderedDict()
 
-
-		all_requests[i]['orig'] = (0,0)
-		all_requests[i]['dest'] = (0,0)
-		while all_requests[i]['orig'][0]==all_requests[i]['dest'][0] and all_requests[i]['orig'][1]==all_requests[i]['dest'][1]:
-			all_requests[i]['orig'] = numpy.array([random.randint(0,GRID_MAX_X),random.randint(0,GRID_MAX_Y)])
-			all_requests[i]['dest'] = numpy.array([random.randint(0,GRID_MAX_X),random.randint(0,GRID_MAX_Y)])
+		if instance_params['flag_nyc_data']==False:
+			all_requests[i]['orig'] = (0,0)
+			all_requests[i]['dest'] = (0,0)
+			while all_requests[i]['orig'][0]==all_requests[i]['dest'][0] and all_requests[i]['orig'][1]==all_requests[i]['dest'][1]:
+				all_requests[i]['orig'] = numpy.array([random.randint(0,GRID_MAX_X),random.randint(0,GRID_MAX_Y)])
+				all_requests[i]['dest'] = numpy.array([random.randint(0,GRID_MAX_X),random.randint(0,GRID_MAX_Y)])
+		else:
+			all_requests[i]['orig'] = (float(odPatterns.iloc[[i]]['pickup_longitude']),float(odPatterns.iloc[[i]]['pickup_latitude']))
+			all_requests[i]['dest'] = (float(odPatterns.iloc[[i]]['dropoff_longitude']),float(odPatterns.iloc[[i]]['dropoff_latitude']))
+			# print all_requests[i]['orig'],all_requests[i]['dest']
 
 		all_requests[i]['detour_sensitivity'] = random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY'])
 
@@ -195,11 +226,39 @@ def flip_coins_w_gamma(instance_partial,coin_flip_params):
 	instance['all_requests'] = all_requests
 	return instance
 
+#helper
 def euclidean(x,y):
 	assert x is not None and y is not None
-	return numpy.linalg.norm(x - y)
+	return numpy.linalg.norm(numpy.asarray(x) - numpy.asarray(y))
+
+#helper
+def haversine(x,y):
+
+	lon1 = x[0]
+	lat1 = x[1]
+	lon2 = y[0]
+	lat2 = y[1]
+
+	"""
+    Calculate the great circle distance between two points 
+    on the earth (specified in decimal degrees)
+    """
+	# convert decimal degrees to radians 
+	lon1, lat1, lon2, lat2 = map(math.radians, [lon1, lat1, lon2, lat2])
+	# haversine formula 
+	dlon = lon2 - lon1 
+	dlat = lat2 - lat1 
+	a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+	c = 2 * math.asin(math.sqrt(a)) 
+	km = 6367 * c + 0.0001
+	return km
 
 def get_driving_distance(focus_request,selected_requests,permutation,instance):
+
+	if instance['instance_params']['flag_nyc_data']==True:
+		dist = haversine
+	else:
+		dist = euclidean
 
 	#local
 	all_requests = instance['all_requests']
@@ -210,7 +269,7 @@ def get_driving_distance(focus_request,selected_requests,permutation,instance):
 		return NotImplementedError
 
 	if len(selected_requests) == 1: #redundant
-		return euclidean(all_requests[selected_requests[0]]['orig'],all_requests[selected_requests[0]]['dest'])
+		return dist(all_requests[selected_requests[0]]['orig'],all_requests[selected_requests[0]]['dest'])
 
 	if len(selected_requests) == 2:
 
@@ -237,17 +296,17 @@ def get_driving_distance(focus_request,selected_requests,permutation,instance):
 		if all_permutations_two[permutation] == 'case1':
 			
 			if focus_request == None:
-				return euclidean(all_requests[i]['orig'],all_requests[j]['orig']) + \
-						euclidean(all_requests[j]['orig'],all_requests[i]['dest']) + \
-						euclidean(all_requests[i]['dest'],all_requests[j]['dest'])
+				return dist(all_requests[i]['orig'],all_requests[j]['orig']) + \
+						dist(all_requests[j]['orig'],all_requests[i]['dest']) + \
+						dist(all_requests[i]['dest'],all_requests[j]['dest'])
 
 			elif focus_request == 'i':
-				return euclidean(all_requests[i]['orig'],all_requests[j]['orig']) + \
-						euclidean(all_requests[j]['orig'],all_requests[i]['dest'])
+				return dist(all_requests[i]['orig'],all_requests[j]['orig']) + \
+						dist(all_requests[j]['orig'],all_requests[i]['dest'])
 
 			elif focus_request == 'j':
-				return euclidean(all_requests[j]['orig'],all_requests[i]['dest']) + \
-						euclidean(all_requests[i]['dest'],all_requests[j]['dest'])
+				return dist(all_requests[j]['orig'],all_requests[i]['dest']) + \
+						dist(all_requests[i]['dest'],all_requests[j]['dest'])
 			else:
 				raise Exception
 
@@ -256,11 +315,11 @@ def get_driving_distance(focus_request,selected_requests,permutation,instance):
 
 			if focus_request == None or focus_request == 'i':
 
-				return euclidean(all_requests[i]['orig'],all_requests[j]['orig']) + \
-						euclidean(all_requests[j]['orig'],all_requests[j]['dest']) + \
-						euclidean(all_requests[j]['dest'],all_requests[i]['dest'])
+				return dist(all_requests[i]['orig'],all_requests[j]['orig']) + \
+						dist(all_requests[j]['orig'],all_requests[j]['dest']) + \
+						dist(all_requests[j]['dest'],all_requests[i]['dest'])
 			elif focus_request == 'j':
-				return euclidean(all_requests[j]['orig'],all_requests[j]['dest'])
+				return dist(all_requests[j]['orig'],all_requests[j]['dest'])
 			else:
 				raise Exception
 		else:
@@ -285,6 +344,11 @@ def check_SIR_satisfaction_general(selected_requests,permutation,instance,experi
 	all_requests = instance['all_requests'] #local copy
 	all_permutations_two = instance['instance_params']['all_permutations_two']
 
+	if instance['instance_params']['flag_nyc_data']==True:
+		dist = haversine
+	else:
+		dist = euclidean
+
 	#Logic
 	if len(selected_requests) > 2:
 		return NotImplementedError
@@ -302,25 +366,25 @@ def check_SIR_satisfaction_general(selected_requests,permutation,instance,experi
 
 		if all_permutations_two[permutation] == 'case1':
 
-			constraint_i =  (all_requests[i]['our_cut_from_requester'][1] - all_requests[i]['our_cut_from_requester'][2])*euclidean(all_requests[i]['orig'],all_requests[i]['dest']) \
+			constraint_i =  (all_requests[i]['our_cut_from_requester'][1] - all_requests[i]['our_cut_from_requester'][2])*dist(all_requests[i]['orig'],all_requests[i]['dest']) \
 				>= (experiment_params['GAMMA'] + all_requests[i]['detour_sensitivity_normalized'])*\
-					(euclidean(all_requests[i]['orig'],all_requests[j]['orig']) + \
-					euclidean(all_requests[j]['orig'],all_requests[i]['dest']) - \
-					euclidean(all_requests[i]['orig'],all_requests[i]['dest']))
-			constraint_j = (all_requests[j]['our_cut_from_requester'][1] - all_requests[j]['our_cut_from_requester'][2])*euclidean(all_requests[j]['orig'],all_requests[j]['dest']) \
+					(dist(all_requests[i]['orig'],all_requests[j]['orig']) + \
+					dist(all_requests[j]['orig'],all_requests[i]['dest']) - \
+					dist(all_requests[i]['orig'],all_requests[i]['dest']))
+			constraint_j = (all_requests[j]['our_cut_from_requester'][1] - all_requests[j]['our_cut_from_requester'][2])*dist(all_requests[j]['orig'],all_requests[j]['dest']) \
 				>= (experiment_params['GAMMA'] + all_requests[j]['detour_sensitivity_normalized'])*\
-					(euclidean(all_requests[j]['orig'],all_requests[i]['dest']) + \
-					euclidean(all_requests[i]['dest'],all_requests[j]['dest']) - \
-					euclidean(all_requests[j]['orig'],all_requests[j]['dest']))
+					(dist(all_requests[j]['orig'],all_requests[i]['dest']) + \
+					dist(all_requests[i]['dest'],all_requests[j]['dest']) - \
+					dist(all_requests[j]['orig'],all_requests[j]['dest']))
 
 		elif all_permutations_two[permutation] == 'case2':
 
-			constraint_i = (all_requests[i]['our_cut_from_requester'][1] - all_requests[i]['our_cut_from_requester'][2])*euclidean(all_requests[i]['orig'],all_requests[i]['dest']) \
+			constraint_i = (all_requests[i]['our_cut_from_requester'][1] - all_requests[i]['our_cut_from_requester'][2])*dist(all_requests[i]['orig'],all_requests[i]['dest']) \
 				>= (experiment_params['GAMMA'] + all_requests[i]['detour_sensitivity_normalized'])*\
-					(euclidean(all_requests[i]['orig'],all_requests[j]['orig']) + \
-					euclidean(all_requests[j]['orig'],all_requests[j]['dest']) + \
-					euclidean(all_requests[j]['dest'],all_requests[i]['dest']) - \
-					euclidean(all_requests[i]['orig'],all_requests[i]['dest']))
+					(dist(all_requests[i]['orig'],all_requests[j]['orig']) + \
+					dist(all_requests[j]['orig'],all_requests[j]['dest']) + \
+					dist(all_requests[j]['dest'],all_requests[i]['dest']) - \
+					dist(all_requests[i]['orig'],all_requests[i]['dest']))
 			constraint_j = all_requests[j]['our_cut_from_requester'][1] >= all_requests[j]['our_cut_from_requester'][2]
 
 		else:
@@ -374,24 +438,40 @@ def get_profit_non_ride_sharing(selected_request_as_list,instance):
 	assert selected_request_as_list is not None	
 	#single id is input as a list to maintain API consistency with get_profit() function
 
+	if instance['instance_params']['flag_nyc_data']==True:
+		dist = haversine
+	else:
+		dist = euclidean
+
 	#print 'selected_request_as_list',selected_request_as_list
 
 	return instance['instance_params']['ALPHA_OP']*\
 		instance['instance_params']['OUR_CUT_FROM_DRIVER']*\
-				euclidean(instance['all_requests'][selected_request_as_list[0]]['orig'],instance['all_requests'][selected_request_as_list[0]]['dest'])
+				dist(instance['all_requests'][selected_request_as_list[0]]['orig'],instance['all_requests'][selected_request_as_list[0]]['dest'])
 
 def get_profit_unmatched(selected_request_as_list,instance):
 	assert instance is not None
 	assert selected_request_as_list is not None	
 	#single id is input as a list to maintain API consistency with get_profit() function
 
+	if instance['instance_params']['flag_nyc_data']==True:
+		dist = haversine
+	else:
+		dist = euclidean
+
 	return instance['instance_params']['ALPHA_OP']*\
 				(instance['all_requests'][selected_request_as_list[0]]['our_cut_from_requester'][1] - \
 					(1 - instance['instance_params']['OUR_CUT_FROM_DRIVER']))*\
-				euclidean(instance['all_requests'][selected_request_as_list[0]]['orig'],instance['all_requests'][selected_request_as_list[0]]['dest'])
+				dist(instance['all_requests'][selected_request_as_list[0]]['orig'],instance['all_requests'][selected_request_as_list[0]]['dest'])
 
 def get_profit_matched(selected_requests,instance,permutation,experiment_params):
 	
+
+	if instance['instance_params']['flag_nyc_data']==True:
+		dist = haversine
+	else:
+		dist = euclidean
+
 	assert len(selected_requests) == 2
 
 	instance_params = instance['instance_params']
@@ -402,7 +482,7 @@ def get_profit_matched(selected_requests,instance,permutation,experiment_params)
 
 		return instance_params['ALPHA_OP']*\
 				(sum([all_requests[m]['our_cut_from_requester'][2]*\
-					euclidean(all_requests[m]['orig'],all_requests[m]['dest']) for m in selected_requests]) - \
+					dist(all_requests[m]['orig'],all_requests[m]['dest']) for m in selected_requests]) - \
 				(1 - instance_params['OUR_CUT_FROM_DRIVER'])*get_driving_distance(None,selected_requests,permutation,instance))
 	elif experiment_params['DISCOUNT_SETTING']=='detour_based':
 
@@ -410,10 +490,10 @@ def get_profit_matched(selected_requests,instance,permutation,experiment_params)
 		for m in selected_requests:
 			beta2 = all_requests[m]['our_cut_from_requester'][1]* \
 				(1 - (get_driving_distance(m,selected_requests,permutation,instance) - \
-				euclidean(all_requests[m]['orig'],all_requests[m]['dest']))*\
-				1.0/euclidean(all_requests[m]['orig'],all_requests[m]['dest']))
+				dist(all_requests[m]['orig'],all_requests[m]['dest']))*\
+				1.0/dist(all_requests[m]['orig'],all_requests[m]['dest']))
 
-			result +=instance_params['ALPHA_OP']*beta2*euclidean(all_requests[m]['orig'],all_requests[m]['dest'])
+			result +=instance_params['ALPHA_OP']*beta2*dist(all_requests[m]['orig'],all_requests[m]['dest'])
 
 		return result - \
 			instance_params['ALPHA_OP']*(1 - instance_params['OUR_CUT_FROM_DRIVER'])*get_driving_distance(None,selected_requests,permutation,instance)
@@ -710,19 +790,25 @@ def get_coin_flip_params_w_gamma(coin_flip_params,coeff_internal=100):
 if __name__=='__main__':
 
 
+	flag_nyc_data 	= True
 	no_INSTANCES  	= 1
-	COEFF_ARRAY_INTERNAL_COINS = [50,150,250,350,1e3] #Depends on scales of beta,gamma and detour sensitivity
-	no_COIN_FLIPS 	= 100
+	COEFF_ARRAY_INTERNAL_COINS = [50,150,250,350,1e3] #[150,250] # 
+	#Above depends on scales of beta,gamma and detour sensitivity
+	no_COIN_FLIPS 	= 100 #10 #
 	do_solve 		= True
-	GAMMA_ARRAY 	= [0,.1,.3,.5,.7,.9]
-	instance_params = get_instance_params(GAMMA_ARRAY=GAMMA_ARRAY)
+	GAMMA_ARRAY 	= [0,.1,.3,.5,.7,.9] #[.3,.6]#
+	instance_params = get_instance_params(GAMMA_ARRAY=GAMMA_ARRAY,flag_nyc_data=flag_nyc_data)
 	GAMMA_ARRAY_ALL = instance_params['GAMMA_ARRAY_ALL']
+	flag_dump_data  = True
 
-	
-	for i in range(no_INSTANCES):
-		print 'Instance {0}: Time : {1}'.format(i,time.ctime())
+	# Read NYC data from disk
+	if flag_nyc_data==True:
+		nyc_df = load_nyc_data()
 
-		instance_base = generate_base_instance(instance_params) #no market assignment yet
+	for instance_no in range(no_INSTANCES):
+		print 'Instance {0}: Time : {1}'.format(instance_no,time.ctime())
+
+		instance_base = generate_base_instance(instance_params,flag_nyc_data,instance_no) #no market assignment yet
 		coin_flip_params_wo_gamma = get_coin_flip_params_wo_gamma()
 		instance_partial = flip_coins_wo_gamma(instance_base,coin_flip_params_wo_gamma) #to keep market share and initial division in market share the same as this stochasticity need not be averaged.
 
@@ -768,12 +854,13 @@ if __name__=='__main__':
 
 	print 'Ending all experiments: The time is :', time.ctime()
 
-	pickle.dump(
-		{'profits_given_coeffs':profits_given_coeffs,
-		'instance_base':instance_base,
-		'COEFF_ARRAY_INTERNAL_COINS':COEFF_ARRAY_INTERNAL_COINS,
-		'no_COIN_FLIPS':no_COIN_FLIPS,
-		'coin_flip_biases_dict':coin_flip_biases_dict,
-		'coin_flip_params_dict':coin_flip_params_dict},
-		open('../../../Xharecost_MS_annex/plot_data.pkl','wb')
-		)	
+	if flag_dump_data:
+		pickle.dump(
+			{'profits_given_coeffs':profits_given_coeffs,
+			'instance_base':instance_base,
+			'COEFF_ARRAY_INTERNAL_COINS':COEFF_ARRAY_INTERNAL_COINS,
+			'no_COIN_FLIPS':no_COIN_FLIPS,
+			'coin_flip_biases_dict':coin_flip_biases_dict,
+			'coin_flip_params_dict':coin_flip_params_dict},
+			open('../../../Xharecost_MS_annex/plot_data.pkl','wb')
+			)	

@@ -1,5 +1,10 @@
 #TODO:
 
+
+
+#######################################################################
+
+
 #Compute coin flip parameter values for each gamma and coefficient value
 pickle.dump({'instances':instances,\
 		'COEFF_ARRAY_INTERNAL_COINS':COEFF_ARRAY_INTERNAL_COINS,
