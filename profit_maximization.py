@@ -654,7 +654,9 @@ def get_profit_from_matched_requests(matched_request_pairs_with_permutations,ins
 	return result
 
 #solves the allocation for ride sharing part (profit from matched and unmatched) in the market as well as profits from non ridehsharing requests
-def solve_instance(coin_flip_no,instance,experiment_params):
+def solve_instance(coin_flip_no,instance,experiment_params,coeff_internal):
+
+	# assert coeff_internal == instance['instance_params']['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL'] #to be commented
 
 	solution = match_requests(instance,experiment_params)
 	total_profit = \
@@ -662,7 +664,14 @@ def solve_instance(coin_flip_no,instance,experiment_params):
 		get_profit_from_unmatched_requests(solution['unmatched_requests'],instance,experiment_params) + \
 		get_profit_from_matched_requests(solution['matched_request_pairs_with_permutations'],instance,experiment_params)
 
-	print "Coeff {5}: Coin flip {4}: Experiment Gamma = {3}. Total profit: {0}. Size of matching graph: {1}. #Total ridesharers: {2}".format(total_profit,len(solution['matching_graph'].nodes()),len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][experiment_params['GAMMA']]==True]),experiment_params['GAMMA'],coin_flip_no,instance['instance_params']['PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL'])
+	print "Coeff {5}: Coin flip {4}: Experiment Gamma = {3}. Total profit: {0}. Size of matching graph: {1}. #Total ridesharers: {2}".format(
+		total_profit,
+		len(solution['matching_graph'].nodes()),
+		len([x for x in instance['all_requests'] if instance['all_requests'][x]['RIDE_SHARING'][experiment_params['GAMMA']]==True]),
+		experiment_params['GAMMA'],
+		coin_flip_no,
+		coeff_internal)
+
 	return solution,total_profit
 
 #helper
@@ -785,13 +794,13 @@ def get_coin_flip_params_w_gamma(coin_flip_params,coeff_internal=100):
 if __name__=='__main__':
 
 
-	flag_nyc_data 	= True
-	no_INSTANCES  	= 1
-	COEFF_ARRAY_INTERNAL_COINS = [300,400,500,600,700,1e3] #[150,250] # 
+	flag_nyc_data 	= False
+	no_INSTANCES  	= 2
+	COEFF_ARRAY_INTERNAL_COINS = [300,400] # [300,400,500,600,700,1e3] 
 	#Above depends on scales of beta,gamma and detour sensitivity
 	no_COIN_FLIPS 	= 10 #100 #
 	do_solve 		= True
-	GAMMA_ARRAY 	= [0.05,.1,.3,.5,.7,.9] #[.3,.6]#
+	GAMMA_ARRAY 	= [.3,.6] #[0.05,.1,.3,.5,.7,.9] #
 	instance_params = get_instance_params(GAMMA_ARRAY=GAMMA_ARRAY,flag_nyc_data=flag_nyc_data)
 	GAMMA_ARRAY_ALL = instance_params['GAMMA_ARRAY_ALL']
 	flag_dump_data  = True
@@ -799,16 +808,24 @@ if __name__=='__main__':
 	# Read NYC data from disk
 	if flag_nyc_data==True:
 		nyc_df = load_nyc_data()
+		assert no_INSTANCES < 60 #for the 0 to59 minute blocks in our NYC data.
 	else:
 		nyc_df = None
 
-	for instance_no in [42]:#range(no_INSTANCES):
+	data_multiple_instances = {}
+	for instance_no in range(no_INSTANCES):
 		print 'Instance {0}: Time : {1}'.format(instance_no,time.ctime())
 
 		instance_base = generate_base_instance(instance_params,flag_nyc_data,instance_no,nyc_df) #no market assignment yet
 		coin_flip_params_wo_gamma = get_coin_flip_params_wo_gamma()
 		instance_partial = flip_coins_wo_gamma(instance_base,coin_flip_params_wo_gamma) #to keep market share and initial division in market share the same as this stochasticity need not be averaged.
 
+		#noSIR. Hence, does not depend on probability coefficient or gamma values
+		experiment_params = {'DISCOUNT_SETTING':'detour_based','GAMMA':'no_gamma'} # 'independent'
+		baseline_solution,baseline_profit = solve_instance(-1,instance_partial,experiment_params,-1)
+		baseline_instance = instance_partial
+
+		#with SIR
 		profits_given_coeffs  = {} #logging purposes
 		coin_flip_params_dict = {} #logging purposes
 		coin_flip_biases_dict = {} #logging purposes
@@ -818,20 +835,21 @@ if __name__=='__main__':
 
 			instance_dict = {}
 			solution_dict = {}
-			total_profit_array 							= numpy.zeros((len(GAMMA_ARRAY_ALL),no_COIN_FLIPS))
+			total_profit_array 							= numpy.zeros((len(GAMMA_ARRAY),no_COIN_FLIPS))
 			people_count_dict = {}
-			people_count_dict['total_people'] 			= numpy.zeros((len(GAMMA_ARRAY_ALL),no_COIN_FLIPS))
-			people_count_dict['additional_people'] 		= numpy.zeros((len(GAMMA_ARRAY_ALL),no_COIN_FLIPS))
-			people_count_dict['additional_people_pct'] 	= numpy.zeros((len(GAMMA_ARRAY_ALL),no_COIN_FLIPS))
+			people_count_dict['total_people'] 			= numpy.zeros((len(GAMMA_ARRAY),no_COIN_FLIPS))
+			people_count_dict['additional_people'] 		= numpy.zeros((len(GAMMA_ARRAY),no_COIN_FLIPS))
+			people_count_dict['additional_people_pct'] 	= numpy.zeros((len(GAMMA_ARRAY),no_COIN_FLIPS))
 			for coin_flip_no in range(no_COIN_FLIPS):
 				instance = flip_coins_w_gamma(instance_partial,coin_flip_params) #only influx from internal and external changes
 				print 'Coeff {2}: Coin flip {0}: Starting corresponding experiment: Time {1}'.format(coin_flip_no,time.ctime(),coeff_internal)
 				#get_stats(coin_flip_no,instance)
 
 				if do_solve is True:
-					for idx,gamma in enumerate(GAMMA_ARRAY_ALL):
+					for idx,gamma in enumerate(GAMMA_ARRAY):
 						experiment_params = {'DISCOUNT_SETTING':'detour_based','GAMMA':gamma} # 'independent'
-						solution,total_profit = solve_instance(coin_flip_no,instance,experiment_params)
+						solution,total_profit = solve_instance(coin_flip_no,instance,experiment_params,coeff_internal)
+
 						#Logging
 						total_profit_array[idx,coin_flip_no] = total_profit
 						solution_dict[(idx,coin_flip_no)] = solution
@@ -847,19 +865,22 @@ if __name__=='__main__':
 				{'total_profit_array'	: total_profit_array,
 				 'solution_dict'		: solution_dict,
 				 'people_count_dict'	: people_count_dict,
-				 'instance_dict'		:instance_dict}
+				 'instance_dict'		:instance_dict,
+				 'baseline_instance': baseline_instance,
+				 'baseline_profit': baseline_profit,
+				 'baseline_solution': baseline_solution}
 
-			print('\n')
+		print '\n\n\n Instance {0} completed.'.format(instance_no)
 
-	print 'Ending all experiments: The time is :', time.ctime()
-
-	if flag_dump_data:
-		pickle.dump(
-			{'profits_given_coeffs':profits_given_coeffs,
+		data_multiple_instances[instance_no] = {'profits_given_coeffs':profits_given_coeffs,
 			'instance_base':instance_base,
 			'COEFF_ARRAY_INTERNAL_COINS':COEFF_ARRAY_INTERNAL_COINS,
 			'no_COIN_FLIPS':no_COIN_FLIPS,
 			'coin_flip_biases_dict':coin_flip_biases_dict,
-			'coin_flip_params_dict':coin_flip_params_dict},
-			open('../../../Xharecost_MS_annex/plot_data.pkl','wb')
-			)	
+			'coin_flip_params_dict':coin_flip_params_dict}	
+
+	print 'Ending all experiments: The time is :', time.ctime()
+
+	if flag_dump_data:
+		pickle.dump(data_multiple_instances,
+			open('../../../Xharecost_MS_annex/plot_data.pkl','wb'))
