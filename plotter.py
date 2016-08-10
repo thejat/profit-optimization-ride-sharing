@@ -50,10 +50,11 @@ def get_data(filepath='../../../Xharecost_MS_annex/plot_data.pkl'):
 		data['profit_by_prob'][gamma_idx]['median'] = numpy.median(data_matrix, axis=1)
 		data['profit_by_prob'][gamma_idx]['std'] = numpy.std(data_matrix, axis=1)/math.sqrt(data_matrix.shape[1])
 
+	data['data_multiple_instances'] = data_multiple_instances #hack for backward compatibility
 	return data
 
 #plot profit as a function of gamma
-def plot_result_gamma(data):
+def plot_profit_vs_gamma(data):
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
 
@@ -87,7 +88,7 @@ def plot_result_gamma(data):
 	plt.show()	
 
 #plot profit as a function of probability coefficient
-def plot_result_probability(data):
+def plot_profit_vs_probability(data):
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
 
@@ -117,13 +118,15 @@ def plot_result_probability(data):
 	#plt.xscale('log')
 	plt.xlabel('Probability coefficient')
 	plt.ylabel('Profit')
-	plt.title('Variation of profit with probability of choosing to rideshare')
+	plt.title('Profit vs probability of choosing to rideshare')
 	plt.show()
 
-
+#plots median probability values as a function of gamma.
 def plot_probability_gamma(data):
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
+
+	data = data['data_multiple_instances'][0]
 
 	COEFF_ARRAY_INTERNAL_COINS = data['COEFF_ARRAY_INTERNAL_COINS']
 	coin_flip_params_dict = data['coin_flip_params_dict']
@@ -176,7 +179,7 @@ def plot_probability_gamma(data):
 	plt.title('Probability of Conversion (outside provider\'s market)')
 	plt.show()	
 
-#needs a single experiment solution and its corresponding instance. Will plot the OD and the rideshares that happen
+#needs a single experiment solution and its corresponding instance. Will plot the OD and the rideshares that happen. Used in single_experiment.ipynb
 def plot_OD_ridesharing(solution,instance):
 	plot_rs_matched = True
 	if plot_rs_matched == True:
