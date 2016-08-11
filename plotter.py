@@ -64,8 +64,75 @@ def get_data(filepath='../../../Xharecost_MS_annex/plot_data.pkl'):
 		data['people_by_gamma'][coeff_no]['median'] = numpy.median(data_matrix, axis=1)
 		data['people_by_gamma'][coeff_no]['std'] = numpy.std(data_matrix, axis=1)/math.sqrt(data_matrix.shape[1])
 
+
+
+	#A 2d array of percentage increase in profit
+	deltaP = numpy.zeros((len(data['GAMMA_ARRAY']),len(data['COEFF_ARRAY_INTERNAL_COINS'])))
+	for x,v in enumerate(data['GAMMA_ARRAY']):
+	    deltaP[x,] = data['profit_by_gamma'][x]['median']
+	#print deltaP
+	# # a second way of doing the same
+	# deltaP1 = numpy.zeros((len(data['GAMMA_ARRAY']),len(data['COEFF_ARRAY_INTERNAL_COINS']))).T
+	# for x,v in enumerate(data['COEFF_ARRAY_INTERNAL_COINS']):
+	#     deltaP1[x,] = data['profit_by_prob'][x]['median']
+	# print deltaP1.T
+
+	#A 2d array of percentage increase in people/marketshare
+	deltaN = numpy.zeros((len(data['GAMMA_ARRAY']),len(data['COEFF_ARRAY_INTERNAL_COINS'])))
+	for x,v in enumerate(data['GAMMA_ARRAY']):
+	    deltaN[x,] = data['people_by_gamma'][x]['median']
+	#print deltaN
+
+	lb_vector = linspace(0,0.1,3)
+	MAX_DELTA_N = numpy.inf
+	min_market_share_by_profit_lb = numpy.zeros((len(lb_vector),len(data['GAMMA_ARRAY'])))
+	for w,lb in enumerate(lb_vector):
+	    for x,v1 in enumerate(data['GAMMA_ARRAY']):
+	        min_deltaN = MAX_DELTA_N
+	        for y,v2 in enumerate(data['COEFF_ARRAY_INTERNAL_COINS']):
+	            if deltaP[x,y] >= lb:
+	                min_deltaN = min(min_deltaN,deltaN[x,y])
+	        if min_deltaN<MAX_DELTA_N:
+	            min_market_share_by_profit_lb[w,x] = min_deltaN
+	        else:
+	            min_market_share_by_profit_lb[w,x] = None
+	                
+	#print min_market_share_by_profit_lb
+	data['min_market_share_by_profit_lb'] = min_market_share_by_profit_lb
+	data['lb_vector'] = lb_vector
+
+
 	data['data_multiple_instances'] = data_multiple_instances #hack for backward compatibility
 	return data
+
+#helper
+def linspace(a, b, n=10):
+    if n < 2:
+        return b
+    diff = (float(b) - a)/(n - 1)
+    return [diff * i + a  for i in range(n)]
+
+#plot minimum marketshare for profit lowerbound
+def plot_ms_vs_profit_lb(data):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    for lb_idx,lb in enumerate(data['lb_vector']):
+        xs 		= data['GAMMA_ARRAY']
+        ys 		= data['min_market_share_by_profit_lb'][lb_idx,]
+        ax.plot(xs, ys,label=lb)
+
+    legend = ax.legend(loc='best', shadow=True)
+    frame = legend.get_frame()
+    frame.set_facecolor('0.90')
+    for label in legend.get_texts():
+        label.set_fontsize('large')
+    for label in legend.get_lines():
+        label.set_linewidth(1.5)  # the legend line width
+
+    plt.xlabel('Gamma')
+    plt.ylabel('Min Marketshare increase in pct given profit LB')
+    plt.show()
 
 #plot profit as a function of gamma
 def plot_profit_vs_gamma(data):
@@ -137,6 +204,10 @@ def plot_profit_vs_probability(data):
 
 #plots median probability values as a function of gamma.
 def plot_probability_gamma(data):
+	return NotImplementedError
+	# do not store instances, hence the code fails
+	# also, averaging across instances not done
+
 	fig = plt.figure()
 	ax = fig.add_subplot(111)
 
