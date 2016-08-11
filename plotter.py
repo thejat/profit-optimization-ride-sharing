@@ -50,6 +50,20 @@ def get_data(filepath='../../../Xharecost_MS_annex/plot_data.pkl'):
 		data['profit_by_prob'][gamma_idx]['median'] = numpy.median(data_matrix, axis=1)
 		data['profit_by_prob'][gamma_idx]['std'] = numpy.std(data_matrix, axis=1)/math.sqrt(data_matrix.shape[1])
 
+	#additional people as a function of gamma
+	data['people_by_gamma'] = {}
+	for coeff_no,coeff_internal in enumerate(data['COEFF_ARRAY_INTERNAL_COINS']):
+		
+		for instance_no in data_multiple_instances:
+			temp = data_multiple_instances[instance_no]['profits_given_coeffs'][coeff_no]['people_count_dict']['additional_people_pct']
+			if instance_no==0:
+				data_matrix = copy.deepcopy(temp)
+			else:
+				data_matrix = numpy.hstack((data_matrix,temp))
+		data['people_by_gamma'][coeff_no] = {}
+		data['people_by_gamma'][coeff_no]['median'] = numpy.median(data_matrix, axis=1)
+		data['people_by_gamma'][coeff_no]['std'] = numpy.std(data_matrix, axis=1)/math.sqrt(data_matrix.shape[1])
+
 	data['data_multiple_instances'] = data_multiple_instances #hack for backward compatibility
 	return data
 

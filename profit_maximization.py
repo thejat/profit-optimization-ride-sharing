@@ -795,12 +795,12 @@ if __name__=='__main__':
 
 
 	flag_nyc_data 	= False
-	no_INSTANCES  	= 4
-	COEFF_ARRAY_INTERNAL_COINS = [300,400,500,600,700,1e3] # [300,400] # 
+	no_INSTANCES  	= 1
+	COEFF_ARRAY_INTERNAL_COINS = [100,200,300,400,500,600,700,800,900,1e3] # [300,400] # 
 	#Above depends on scales of beta,gamma and detour sensitivity
-	no_COIN_FLIPS 	= 10 # 100 #
+	no_COIN_FLIPS 	= 5 # 100 #
 	do_solve 		= True
-	GAMMA_ARRAY 	= [0.05,.1,.3,.5,.7,.9] # [.3,.6] #
+	GAMMA_ARRAY 	= [0.05,.1,.2,.3,.4,.5,.6,.7,.8,.9] # [.3,.6] #
 	instance_params = get_instance_params(GAMMA_ARRAY=GAMMA_ARRAY,flag_nyc_data=flag_nyc_data)
 	GAMMA_ARRAY_ALL = instance_params['GAMMA_ARRAY_ALL']
 	flag_dump_data  = True
