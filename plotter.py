@@ -98,6 +98,8 @@ def get_data(filepath='../../../Xharecost_MS_annex/plot_data.pkl'):
 	            min_market_share_by_profit_lb[w,x] = None
 	                
 	#print min_market_share_by_profit_lb
+	data['deltaN'] = deltaN
+	data['deltaP'] = deltaP
 	data['min_market_share_by_profit_lb'] = min_market_share_by_profit_lb
 	data['lb_vector'] = lb_vector
 
@@ -112,10 +114,64 @@ def linspace(a, b, n=10):
     diff = (float(b) - a)/(n - 1)
     return [diff * i + a  for i in range(n)]
 
-#plot minimum marketshare for profit lowerbound
-def plot_ms_vs_profit_lb(data):
+#profit increase vs marketshare increase
+def intro_plot(data):
+#     profit_levels = linspace(min(data['deltaP'].ravel()),max(data['deltaP'].ravel()),10)
+    market_share_levels = linspace(min(data['deltaN'].ravel()),max(data['deltaN'].ravel()),10)
+    MIN_DELTA_P = -1*numpy.inf
+    max_profit_by_max_market_share = numpy.zeros(len(market_share_levels))
+    for w,ub in enumerate(market_share_levels):
+        profit_level = MIN_DELTA_P
+        for i in range(data['deltaN'].shape[0]):
+            for j in range(data['deltaN'].shape[1]):
+                if data['deltaN'][i,j] <= ub:
+                    profit_level = max(profit_level,data['deltaP'][i,j])
+        if profit_level > MIN_DELTA_P:
+            max_profit_by_max_market_share[w] = profit_level
+        else:
+            max_profit_by_max_market_share[w] = None
+    #data['max_profit_by_max_market_share'] = max_profit_by_max_market_share
+    #data['market_share_levels'] = market_share_levels
+    #return [max_profit_by_max_market_share,market_share_levels]
+
+    import matplotlib
+    import matplotlib.pyplot as plt
     fig = plt.figure()
     ax = fig.add_subplot(111)
+    xs = market_share_levels
+    ys = max_profit_by_max_market_share
+    ax.plot(xs, ys)
+    ys0 = numpy.zeros(len(max_profit_by_max_market_share))
+    ax.plot(xs, ys0)
+    plt.xlabel('Pct increase in marketshare due to SIR (cumulative)')
+    plt.ylabel('Max pct increase in profit given marketshare UB')
+    plt.show()
+
+#plot minimum marketshare for profit lowerbound
+def plot_ms_vs_profit_lb(data,lb_vector=None):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    #code repetition
+    if lb_vector is not None:
+		MAX_DELTA_N = numpy.inf
+		min_market_share_by_profit_lb = numpy.zeros((len(lb_vector),len(data['GAMMA_ARRAY'])))
+		for w,lb in enumerate(lb_vector):
+		    for x,v1 in enumerate(data['GAMMA_ARRAY']):
+		        min_deltaN = MAX_DELTA_N
+		        for y,v2 in enumerate(data['COEFF_ARRAY_INTERNAL_COINS']):
+		            if data['deltaP'][x,y] >= lb:
+		                min_deltaN = min(min_deltaN,data['deltaN'][x,y])
+		        if min_deltaN<MAX_DELTA_N:
+		            min_market_share_by_profit_lb[w,x] = min_deltaN
+		        else:
+		            min_market_share_by_profit_lb[w,x] = None
+		                
+		#print min_market_share_by_profit_lb
+		data['min_market_share_by_profit_lb'] = min_market_share_by_profit_lb
+		data['lb_vector'] = lb_vector
+	#code repetition ends
+
 
     for lb_idx,lb in enumerate(data['lb_vector']):
         xs 		= data['GAMMA_ARRAY']
