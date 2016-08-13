@@ -1,15 +1,5 @@
-import random, time, math, copy, numpy, pickle
-import networkx as nx
-import pandas
-from pprint import pprint
-from collections import OrderedDict
-import multiprocessing
-# import  matplotlib
-# matplotlib.use('Agg')
-# import matplotlib.pyplot as plt
-random.seed(5000)  # for replicability of experiments.
+import random, time, math, copy, numpy, pickle, argparse, pandas, multiprocessing, networkx, pprint,collections
 __author__ = 'q4fj4lj9'
-
 
 def load_nyc_data():
 	df0 = pandas.read_csv('../../../Xharecost_MS_annex/hour9.csv',usecols= ['pickup_datetime','passenger_count','pickup_longitude','pickup_latitude','dropoff_longitude','dropoff_latitude'])
@@ -78,10 +68,12 @@ def generate_base_instance(instance_params,instance_no=0,nyc_df=None):
 		odPatterns = get_nyc_data(nyc_df,instance_no)
 		instance_params['NO_OF_REQUESTS_IN_UNIVERSE'] = len(odPatterns)
 
+
+
 	# GENERATE OD locations for all requests
-	all_requests = OrderedDict()
+	all_requests = collections.OrderedDict()
 	for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE']):
-		all_requests[i] = OrderedDict()
+		all_requests[i] = collections.OrderedDict()
 
 		if instance_params['flag_nyc_data']==False:
 			all_requests[i]['orig'] = (0,0)
@@ -94,32 +86,41 @@ def generate_base_instance(instance_params,instance_no=0,nyc_df=None):
 			all_requests[i]['dest'] = (float(odPatterns.iloc[[i]]['dropoff_longitude']),float(odPatterns.iloc[[i]]['dropoff_latitude']))
 			# print all_requests[i]['orig'],all_requests[i]['dest']
 
-		if instance_params['uniform_detour_sensitivity']==True
-			all_requests[i]['detour_sensitivity'] = random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY'])
-		else:
-			all_requests[i]['detour_sensitivity'] = random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY'])
 
-		all_requests[i]['detour_sensitivity_normalized'] = all_requests[i]['detour_sensitivity']*1.0/instance_params['ALPHA_OP']
-
+	#Fill in some default values
+	for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE']):
 		all_requests[i]['our_cut_from_requester'] = instance_params['OUR_CUT_FROM_REQUESTER_COMMON']
 
 		#some default values
-		all_requests[i]['PROVIDER_MARKET'] = OrderedDict()
+		all_requests[i]['PROVIDER_MARKET'] = collections.OrderedDict()
 		all_requests[i]['PROVIDER_MARKET']['no_gamma'] = False
 		for gamma in instance_params['GAMMA_ARRAY']:
 			all_requests[i]['PROVIDER_MARKET'][gamma] = False
 		
 		#RIDE_SHARING key will be a dictionary with gamma as keys
-		all_requests[i]['RIDE_SHARING'] = OrderedDict()
+		all_requests[i]['RIDE_SHARING'] = collections.OrderedDict()
 		all_requests[i]['RIDE_SHARING']['no_gamma'] = False
 		for gamma in instance_params['GAMMA_ARRAY']:
 			all_requests[i]['RIDE_SHARING'][gamma] = False
 
 		#For Logging purposes: RIDE_SHARING_BIAS key will be a dictionary with gamma as keys
-		all_requests[i]['RIDE_SHARING_BIAS'] = OrderedDict()
+		all_requests[i]['RIDE_SHARING_BIAS'] = collections.OrderedDict()
 		all_requests[i]['RIDE_SHARING_BIAS']['no_gamma'] = -1 #Convention: NO FLIP means negative value
 		for gamma in instance_params['GAMMA_ARRAY']:
 			all_requests[i]['RIDE_SHARING_BIAS'][gamma] = -1 #Convention: NO FLIP means negative value
+
+
+	#Generate detour sensitivities
+	if instance_params['uniform_detour_sensitivity']==True:
+		sensitivities = [random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY']) for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
+	else:
+		scipytn = scipy.stats.truncnorm(-2, 2,loc=instance_params['ALPHA_OP']+1, scale=int(0.25*instance_params['MAX_DETOUR_SENSITIVITY']))
+		sensitivities = scipytn.rvs(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])
+
+	for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE']):
+		all_requests[i]['detour_sensitivity'] = sensitivities[i]
+		all_requests[i]['detour_sensitivity_normalized'] = all_requests[i]['detour_sensitivity']*1.0/instance_params['ALPHA_OP']
+
 		
 	#Flipping coins is moved to its own function
 
@@ -565,7 +566,7 @@ def is_interested_in_ridesharing(i,instance,experiment_params):
 #edmonds
 def match_requests(instance,experiment_params):
 
-	H = nx.Graph()
+	H = networkx.Graph()
 	request_pairs_with_permutations = {}
 	non_ridesharing_requests = []
 	unmatched_requests_initial = set()
@@ -591,19 +592,19 @@ def match_requests(instance,experiment_params):
 					# print "Include edge {0},{1}  :   {2}".format(i,j,incremental_profit)
 
 	#these requests failed to satisfy incremental profit > 0 for any of their potential ridesharing neighbors
-	#pprint(unmatched_requests_initial)
+	#pprint.pprint(unmatched_requests_initial)
 	#print H.nodes()
 	unmatched_requests_initial = [x for x in unmatched_requests_initial if str(x) not in H.nodes()]
-	#pprint(unmatched_requests_initial)
+	#pprint.pprint(unmatched_requests_initial)
 
-	mates = nx.max_weight_matching(H)
+	mates = networkx.max_weight_matching(H)
 	matched_request_pairs_with_permutations = {}
 	for i,j in mates.items():
 		if int(i) < int(j):
 			# print "types: {0},{1},{2},{3}".format(i,type(i),j,type(j))
 			matched_request_pairs_with_permutations[(int(i),int(j))] = request_pairs_with_permutations[(int(i),int(j))]
 	unmatched_requests = [int(x) for x in H.nodes() if x not in mates.keys()]
-	#pprint(unmatched_requests)
+	#pprint.pprint(unmatched_requests)
 	if len(unmatched_requests_initial)>0:
 		if len(unmatched_requests) >0:
 			unmatched_requests.extend(unmatched_requests_initial)
@@ -615,7 +616,7 @@ def match_requests(instance,experiment_params):
 	'matched_request_pairs_with_permutations':matched_request_pairs_with_permutations,
 	'matching_graph':H}
 
-	# pprint(result)
+	# pprint.pprint(result)
 
 	return result
 
@@ -814,6 +815,7 @@ def do_experiment(metadata):
 	assert metadata['no_COIN_FLIPS'] is not None
 	assert metadata['uniform_detour_sensitivity'] is not None
 	assert metadata['filename_pickle'] is not None
+	assert metadata['flag_multiprocessing'] is not None
 
 
 	instance_params = get_instance_params(metadata)
@@ -871,10 +873,13 @@ def do_experiment(metadata):
 						'coeff_internal':coeff_internal})
 
 				# solution_tuple_list = map(solve_instance,problem_instance_list)
-				pool = multiprocessing.Pool()
-				solution_tuple_list = pool.map(solve_instance,problem_instance_list)
-				pool.close()
-				pool.join() 
+				if metadata['flag_multiprocessing'] is True:
+					pool = multiprocessing.Pool()
+					solution_tuple_list = pool.map(solve_instance,problem_instance_list)
+					pool.close()
+					pool.join() 
+				else:
+					solution_tuple_list = map(solve_instance,problem_instance_list)
 
 				#Logging
 				for idx,gamma in enumerate(metadata['GAMMA_ARRAY']):
@@ -913,26 +918,38 @@ def do_experiment(metadata):
 # vprof -c cmh -s profit_maximization.py
 if __name__=='__main__':
 
+	random.seed(5000)  # for replicability of experiments.
+	numpy.random.seed(5000) #needed for truncated normal. not thread-safe.
 
-	metadata = {}
-	metadata['flag_nyc_data'] 	= False
-	metadata['COEFF_ARRAY_INTERNAL_COINS'] = [100,200,300,400,500,600,700,800,900,1e3] # [300,400] # 	
-	metadata['GAMMA_ARRAY'] 	= [0.05,.1,.2,.3,.4,.5,.6,.7,.8,.9] # [.3,.6] # 
-	metadata['flag_dump_data']  = True
-	metadata['no_INSTANCES']  	= 60 if metadata['flag_nyc_data'] else 60 # else 10 #
-	metadata['no_COIN_FLIPS'] 	= 10 if metadata['flag_nyc_data'] else 10 # else 100 #
-	metadata['uniform_detour_sensitivity'] = True
-	metadata['filename_pickle'] = '../../../Xharecost_MS_annex/plot_data_nyc_all60.pkl' if metadata['flag_nyc_data'] else '../../../Xharecost_MS_annex/plot_data_simulated_all60.pkl'
-	# do_experiment(metadata)
+	parser = argparse.ArgumentParser(description='Profit maximization using Sequential Individual Rationality')
+	parser.add_argument('-s','--sensitivity',help='Sensitivity type: unif or trnornal', required=False)
+	parser.add_argument('-d','--data', help='Data value: nyc or sim',required=False)
+	args = parser.parse_args()
+	print ("Sensitivity value: %s" % args.sensitivity )
+	print ("Data value: %s" % args.data )
 
+	uniform_detour_sensitivity = False if args.sensitivity=='trnornal' else True
 
-	#bug testing code
-	test_metadata = {'flag_nyc_data': False,
-				'COEFF_ARRAY_INTERNAL_COINS' : [100,200,300,400,500,600,700,800,900,1e3], # [300,400] # 	
-				'GAMMA_ARRAY' 		: [0.05,.1,.2,.3,.4,.5,.6,.7,.8,.9], # [.3,.6] # 
+	if args.data is None:
+		metadata = {'flag_nyc_data': False,
+				'COEFF_ARRAY_INTERNAL_COINS' : [100,300,600], 	
+				'GAMMA_ARRAY' 		: [.2,.6], 
 				'flag_dump_data'  	: True,
 				'no_INSTANCES'  	: 2,
-				'no_COIN_FLIPS' 	: 5,
-				'uniform_detour_sensitivity' : True,
-				'filename_pickle'   : '../../../Xharecost_MS_annex/plot_data_test.pkl'}
-	do_experiment(test_metadata)
+				'no_COIN_FLIPS' 	: 3,
+				'uniform_detour_sensitivity' : uniform_detour_sensitivity,
+				'filename_pickle'   : '../../../Xharecost_MS_annex/plot_data_test.pkl',
+				'flag_multiprocessing': False}
+	else:
+		metadata = {}
+		metadata['flag_nyc_data'] = True if args.data=='nyc' else False
+		metadata['COEFF_ARRAY_INTERNAL_COINS'] = [100,200,300,400,500,600,700,800,900,1e3] # [300,400] # 	
+		metadata['GAMMA_ARRAY'] 	= [0.05,.1,.2,.3,.4,.5,.6,.7,.8,.9] # [.3,.6] # 
+		metadata['flag_dump_data']  = True
+		metadata['no_INSTANCES']  	= 60 if metadata['flag_nyc_data'] else 60 # else 10 #
+		metadata['no_COIN_FLIPS'] 	= 10 if metadata['flag_nyc_data'] else 10 # else 100 #
+		metadata['uniform_detour_sensitivity'] = uniform_detour_sensitivity
+		metadata['filename_pickle'] = '../../../Xharecost_MS_annex/plot_data_nyc_all60.pkl' if metadata['flag_nyc_data'] else '../../../Xharecost_MS_annex/plot_data_simulated_all60.pkl'
+		metadata['flag_multiprocessing'] = True
+
+	do_experiment(metadata)

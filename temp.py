@@ -65,5 +65,15 @@ for coeff_no,coeff_internal in enumerate(COEFF_ARRAY_INTERNAL_COINS):
         output[coeff_no,idx] = numpy.median(numpy.asarray(temp_meta))
 print output
 #######################################################################
+
+
+%matplotlib notebook
+import matplotlib.pyplot as plt
+import scipy.stats, numpy
+numpy.random.seed(0)
+scipytn = scipy.stats.truncnorm(-2, 2,loc=51, scale=25)
+scipyvals = scipytn.rvs(10000)
+plt.hist(scipyvals,100)
+plt.show()
 #######################################################################
 #######################################################################
