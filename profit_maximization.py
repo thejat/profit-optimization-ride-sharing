@@ -23,7 +23,7 @@ def load_nyc_data():
 
 def get_nyc_data(nyc_df,instance_no=0):
 	
-	assert instance_no >=0 and instance_no <= 60
+	assert instance_no >=0 and instance_no < 60
 	assert type(instance_no) is int
 
 	data = nyc_df[(nyc_df['pickup_datetime'].dt.minute >= instance_no) & \
@@ -31,7 +31,11 @@ def get_nyc_data(nyc_df,instance_no=0):
 	print 'NYC instance for minute: {0} count of requests: {1}'.format(instance_no,len(data))
 	return data
 
-def get_instance_params(NO_OF_REQUESTS_IN_UNIVERSE=100,GAMMA_ARRAY=[0,0.1,0.2,0.3,0.4],flag_nyc_data=False):
+def get_instance_params(metadata):
+
+	assert metadata['flag_nyc_data'] is not None
+	assert metadata['GAMMA_ARRAY'] is not None
+	assert metadata['uniform_detour_sensitivity'] is not None
 
 	#requests and service provider details
 	BETA1 = 0.9
@@ -47,14 +51,12 @@ def get_instance_params(NO_OF_REQUESTS_IN_UNIVERSE=100,GAMMA_ARRAY=[0,0.1,0.2,0.
 			('sj','si','dj','di'):'case1',
 			('sj','si','di','dj'):'case2'}#TODO: make more comprehensible
 
-	# GAMMA_ARRAY = [float("%.3f" % (BETA1**(2*x+1))) for x in range(10,-1,-2)]
-	# GAMMA_ARRAY.append(0)
-	GAMMA_ARRAY = sorted(GAMMA_ARRAY) #see default in function arg definition
+
+	GAMMA_ARRAY = sorted(metadata['GAMMA_ARRAY']) #see default in function arg definition
 	GAMMA_ARRAY_ALL = ['no_gamma'] 	#redundant array
 	GAMMA_ARRAY_ALL.extend(GAMMA_ARRAY)
 
 	return {
-	'NO_OF_REQUESTS_IN_UNIVERSE':NO_OF_REQUESTS_IN_UNIVERSE,
 	'OUR_CUT_FROM_REQUESTER_COMMON':OUR_CUT_FROM_REQUESTER_COMMON,
 	'MAX_DETOUR_SENSITIVITY': MAX_DETOUR_SENSITIVITY,
 	'OUR_CUT_FROM_DRIVER': OUR_CUT_FROM_DRIVER,
@@ -62,14 +64,16 @@ def get_instance_params(NO_OF_REQUESTS_IN_UNIVERSE=100,GAMMA_ARRAY=[0,0.1,0.2,0.
 	'all_permutations_two': all_permutations_two,
 	'GAMMA_ARRAY':GAMMA_ARRAY,
 	'GAMMA_ARRAY_ALL': GAMMA_ARRAY_ALL,
-	'flag_nyc_data':flag_nyc_data}
+	'flag_nyc_data':metadata['flag_nyc_data'],
+	'uniform_detour_sensitivity': metadata['uniform_detour_sensitivity']}
 
-def generate_base_instance(instance_params,flag_nyc_data=False,instance_no=0,nyc_df=None):
+def generate_base_instance(instance_params,instance_no=0,nyc_df=None):
 
 	if instance_params['flag_nyc_data']==False:
 		GRID_MAX   = 100
 		GRID_MAX_X = GRID_MAX
 		GRID_MAX_Y = GRID_MAX
+		instance_params['NO_OF_REQUESTS_IN_UNIVERSE'] = 200 #hard constant to match NYC 2013-11-01 9am-10am
 	else:
 		odPatterns = get_nyc_data(nyc_df,instance_no)
 		instance_params['NO_OF_REQUESTS_IN_UNIVERSE'] = len(odPatterns)
@@ -90,7 +94,10 @@ def generate_base_instance(instance_params,flag_nyc_data=False,instance_no=0,nyc
 			all_requests[i]['dest'] = (float(odPatterns.iloc[[i]]['dropoff_longitude']),float(odPatterns.iloc[[i]]['dropoff_latitude']))
 			# print all_requests[i]['orig'],all_requests[i]['dest']
 
-		all_requests[i]['detour_sensitivity'] = random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY'])
+		if instance_params['uniform_detour_sensitivity']==True
+			all_requests[i]['detour_sensitivity'] = random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY'])
+		else:
+			all_requests[i]['detour_sensitivity'] = random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY'])
 
 		all_requests[i]['detour_sensitivity_normalized'] = all_requests[i]['detour_sensitivity']*1.0/instance_params['ALPHA_OP']
 
@@ -795,33 +802,34 @@ def get_coin_flip_params_w_gamma(coin_flip_params,coeff_internal=100):
 		'GAMMA_OFFSET': GAMMA_OFFSET})
 	return coin_flip_params
 
+#wrapper around experiment run
+def do_experiment(metadata):
 
-# vprof -c cmh -s profit_maximization.py
-if __name__=='__main__':
+	assert metadata is not None
+	assert metadata['flag_nyc_data'] is not None
+	assert metadata['COEFF_ARRAY_INTERNAL_COINS'] is not None
+	assert metadata['GAMMA_ARRAY'] is not None
+	assert metadata['flag_dump_data'] is not None
+	assert metadata['no_INSTANCES'] is not None
+	assert metadata['no_COIN_FLIPS'] is not None
+	assert metadata['uniform_detour_sensitivity'] is not None
+	assert metadata['filename_pickle'] is not None
 
 
-	flag_nyc_data 	= False
-	no_INSTANCES  	= 10
-	COEFF_ARRAY_INTERNAL_COINS = [100,200,300,400,500,600,700,800,900,1e3] # [300,400] # 
-	#Above depends on scales of beta,gamma and detour sensitivity
-	no_COIN_FLIPS 	= 100 # 10 # 
-	GAMMA_ARRAY 	= [0.05,.1,.2,.3,.4,.5,.6,.7,.8,.9] # [.3,.6] # 
-	instance_params = get_instance_params(GAMMA_ARRAY=GAMMA_ARRAY,flag_nyc_data=flag_nyc_data)
-	GAMMA_ARRAY_ALL = instance_params['GAMMA_ARRAY_ALL']
-	flag_dump_data  = True
+	instance_params = get_instance_params(metadata)
 
 	# Read NYC data from disk
-	if flag_nyc_data==True:
+	if metadata['flag_nyc_data']==True:
 		nyc_df = load_nyc_data()
-		assert no_INSTANCES < 60 #for the 0 to59 minute blocks in our NYC data.
+		assert metadata['no_INSTANCES'] < 60 #for the 0 to59 minute blocks in our NYC data.
 	else:
 		nyc_df = None
 
 	data_multiple_instances = {}
-	for instance_no in range(no_INSTANCES):
+	for instance_no in range(metadata['no_INSTANCES']):
 		print 'Instance {0}: Time : {1}'.format(instance_no,time.ctime())
 
-		instance_base = generate_base_instance(instance_params,flag_nyc_data,instance_no,nyc_df) #no market assignment yet
+		instance_base = generate_base_instance(instance_params,instance_no,nyc_df) #no market assignment yet
 		coin_flip_params_wo_gamma = get_coin_flip_params_wo_gamma()
 		instance_partial = flip_coins_wo_gamma(instance_base,coin_flip_params_wo_gamma) #to keep market share and initial division in market share the same as this stochasticity need not be averaged.
 
@@ -835,23 +843,23 @@ if __name__=='__main__':
 		profits_given_coeffs  = {} #logging purposes
 		coin_flip_params_dict = {} #logging purposes
 		coin_flip_biases_dict = {} #logging purposes
-		for coeff_no,coeff_internal in enumerate(COEFF_ARRAY_INTERNAL_COINS):
+		for coeff_no,coeff_internal in enumerate(metadata['COEFF_ARRAY_INTERNAL_COINS']):
 
 			coin_flip_params = get_coin_flip_params_w_gamma(coin_flip_params_wo_gamma,coeff_internal)
 
 			# instance_dict = {}
 			solution_dict = {}
-			total_profit_array 							= numpy.zeros((len(GAMMA_ARRAY),no_COIN_FLIPS))
+			total_profit_array 							= numpy.zeros((len(metadata['GAMMA_ARRAY']),metadata['no_COIN_FLIPS']))
 			people_count_dict = {}
-			people_count_dict['total_people'] 			= numpy.zeros((len(GAMMA_ARRAY),no_COIN_FLIPS))
-			people_count_dict['additional_people'] 		= numpy.zeros((len(GAMMA_ARRAY),no_COIN_FLIPS))
-			people_count_dict['additional_people_pct'] 	= numpy.zeros((len(GAMMA_ARRAY),no_COIN_FLIPS))
-			for coin_flip_no in range(no_COIN_FLIPS):
+			people_count_dict['total_people'] 			= numpy.zeros((len(metadata['GAMMA_ARRAY']),metadata['no_COIN_FLIPS']))
+			people_count_dict['additional_people'] 		= numpy.zeros((len(metadata['GAMMA_ARRAY']),metadata['no_COIN_FLIPS']))
+			people_count_dict['additional_people_pct'] 	= numpy.zeros((len(metadata['GAMMA_ARRAY']),metadata['no_COIN_FLIPS']))
+			for coin_flip_no in range(metadata['no_COIN_FLIPS']):
 				instance = flip_coins_w_gamma(instance_partial,coin_flip_params) #only influx from internal and external changes
 				print 'Coeff {2}: Coin flip {0}: Starting corresponding experiment: Time {1}'.format(coin_flip_no,time.ctime(),coeff_internal)
 
 				problem_instance_list = []
-				for idx,gamma in enumerate(GAMMA_ARRAY):
+				for idx,gamma in enumerate(metadata['GAMMA_ARRAY']):
 					experiment_params = {'DISCOUNT_SETTING':'detour_based','GAMMA':gamma} # 'independent'
 					(people_count_dict['total_people'][idx,coin_flip_no],\
 					people_count_dict['additional_people'][idx,coin_flip_no],\
@@ -869,13 +877,13 @@ if __name__=='__main__':
 				pool.join() 
 
 				#Logging
-				for idx,gamma in enumerate(GAMMA_ARRAY):
+				for idx,gamma in enumerate(metadata['GAMMA_ARRAY']):
 					total_profit_array[idx,coin_flip_no] = solution_tuple_list[idx][1]
 					solution_dict[(idx,coin_flip_no)] = solution_tuple_list[idx][0]
 			
 			#Logging
 			coin_flip_params_dict[coeff_no] = coin_flip_params #logging purposes		
-			coin_flip_biases_dict[coeff_no] = get_coin_flip_biases(GAMMA_ARRAY,instance) #note we assume the last coin flip instance is available outside the no_COIN_FLIPS loop
+			coin_flip_biases_dict[coeff_no] = get_coin_flip_biases(metadata['GAMMA_ARRAY'],instance) #note we assume the last coin flip instance is available outside the no_COIN_FLIPS loop
 			profits_given_coeffs[coeff_no] = \
 				{'total_profit_array'	: total_profit_array,
 				 'solution_dict'		: solution_dict,
@@ -889,13 +897,42 @@ if __name__=='__main__':
 
 		data_multiple_instances[instance_no] = {'profits_given_coeffs':profits_given_coeffs,
 			'instance_base':instance_base,
-			'COEFF_ARRAY_INTERNAL_COINS':COEFF_ARRAY_INTERNAL_COINS,
-			'no_COIN_FLIPS':no_COIN_FLIPS,
+			'COEFF_ARRAY_INTERNAL_COINS':metadata['COEFF_ARRAY_INTERNAL_COINS'],
+			'no_COIN_FLIPS':metadata['no_COIN_FLIPS'],
 			'coin_flip_biases_dict':coin_flip_biases_dict,
 			'coin_flip_params_dict':coin_flip_params_dict}	
 
-		if flag_dump_data: #dump and overwrite after every instance
+		if metadata['flag_dump_data']: #dump and overwrite after every instance
 			pickle.dump(data_multiple_instances,
-				open('../../../Xharecost_MS_annex/plot_data.pkl','wb'))
+				open(metadata['filename_pickle'],'wb'))
 
 	print 'Ending all experiments: The time is :', time.ctime()
+
+
+
+# vprof -c cmh -s profit_maximization.py
+if __name__=='__main__':
+
+
+	metadata = {}
+	metadata['flag_nyc_data'] 	= False
+	metadata['COEFF_ARRAY_INTERNAL_COINS'] = [100,200,300,400,500,600,700,800,900,1e3] # [300,400] # 	
+	metadata['GAMMA_ARRAY'] 	= [0.05,.1,.2,.3,.4,.5,.6,.7,.8,.9] # [.3,.6] # 
+	metadata['flag_dump_data']  = True
+	metadata['no_INSTANCES']  	= 60 if metadata['flag_nyc_data'] else 60 # else 10 #
+	metadata['no_COIN_FLIPS'] 	= 10 if metadata['flag_nyc_data'] else 10 # else 100 #
+	metadata['uniform_detour_sensitivity'] = True
+	metadata['filename_pickle'] = '../../../Xharecost_MS_annex/plot_data_nyc_all60.pkl' if metadata['flag_nyc_data'] else '../../../Xharecost_MS_annex/plot_data_simulated_all60.pkl'
+	# do_experiment(metadata)
+
+
+	#bug testing code
+	test_metadata = {'flag_nyc_data': False,
+				'COEFF_ARRAY_INTERNAL_COINS' : [100,200,300,400,500,600,700,800,900,1e3], # [300,400] # 	
+				'GAMMA_ARRAY' 		: [0.05,.1,.2,.3,.4,.5,.6,.7,.8,.9], # [.3,.6] # 
+				'flag_dump_data'  	: True,
+				'no_INSTANCES'  	: 2,
+				'no_COIN_FLIPS' 	: 5,
+				'uniform_detour_sensitivity' : True,
+				'filename_pickle'   : '../../../Xharecost_MS_annex/plot_data_test.pkl'}
+	do_experiment(test_metadata)
