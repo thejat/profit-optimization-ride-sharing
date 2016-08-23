@@ -2,7 +2,9 @@ import numpy, math, pickle, copy
 import matplotlib
 import matplotlib.pyplot as plt
 
-def get_data(filepath='../../../Xharecost_MS_annex/plot_data.pkl'):
+def get_data(filepath='../../../../sharecost_ms_annex/plot_data_test.pkl'):
+
+	print "DEFAULT IS TEST DATA UNLESS SPECIFIED OTHERWISE"
 
 	#read data
 	data_multiple_instances = pickle.load(open(filepath,'rb'))
@@ -21,7 +23,9 @@ def get_data(filepath='../../../Xharecost_MS_annex/plot_data.pkl'):
 	for coeff_no,coeff_internal in enumerate(data['COEFF_ARRAY_INTERNAL_COINS']):
 		
 		for instance_no in data_multiple_instances:
-			temp = (data_multiple_instances[instance_no]['profits_given_coeffs'][coeff_no]['total_profit_array'] - data_multiple_instances[instance_no]['profits_given_coeffs'][coeff_no]['baseline_profit'])/(data_multiple_instances[instance_no]['profits_given_coeffs'][coeff_no]['baseline_profit'] + 1e-5)
+			temp = (data_multiple_instances[instance_no]['profits_given_coeffs'][coeff_no]['total_profit_array'] \
+				  - data_multiple_instances[instance_no]['profits_given_coeffs'][coeff_no]['baseline_profit']) \
+					/(data_multiple_instances[instance_no]['profits_given_coeffs'][coeff_no]['baseline_profit'] + 1e-5)
 			if instance_no==0:
 				data_matrix = copy.deepcopy(temp)
 			else:
@@ -39,7 +43,9 @@ def get_data(filepath='../../../Xharecost_MS_annex/plot_data.pkl'):
 		for coeff_no,coeff_internal in enumerate(data['COEFF_ARRAY_INTERNAL_COINS']):
 
 			for instance_no in data_multiple_instances:
-				temp = (data_multiple_instances[instance_no]['profits_given_coeffs'][coeff_no]['total_profit_array'][gamma_idx,] - data_multiple_instances[instance_no]['profits_given_coeffs'][coeff_no]['baseline_profit'])/(data_multiple_instances[instance_no]['profits_given_coeffs'][coeff_no]['baseline_profit'] + 1e-5)
+				temp = (data_multiple_instances[instance_no]['profits_given_coeffs'][coeff_no]['total_profit_array'][gamma_idx,] \
+					  - data_multiple_instances[instance_no]['profits_given_coeffs'][coeff_no]['baseline_profit']) \
+						/(data_multiple_instances[instance_no]['profits_given_coeffs'][coeff_no]['baseline_profit'] + 1e-5)
 				if instance_no ==0:
 					data_vector = copy.deepcopy(temp)
 				else:
@@ -69,19 +75,14 @@ def get_data(filepath='../../../Xharecost_MS_annex/plot_data.pkl'):
 	#A 2d array of percentage increase in profit
 	deltaP = numpy.zeros((len(data['GAMMA_ARRAY']),len(data['COEFF_ARRAY_INTERNAL_COINS'])))
 	for x,v in enumerate(data['GAMMA_ARRAY']):
-	    deltaP[x,] = data['profit_by_gamma'][x]['median']
-	#print deltaP
-	# # a second way of doing the same
-	# deltaP1 = numpy.zeros((len(data['GAMMA_ARRAY']),len(data['COEFF_ARRAY_INTERNAL_COINS']))).T
-	# for x,v in enumerate(data['COEFF_ARRAY_INTERNAL_COINS']):
-	#     deltaP1[x,] = data['profit_by_prob'][x]['median']
-	# print deltaP1.T
+		for y,v2 in enumerate(data['COEFF_ARRAY_INTERNAL_COINS']):
+			deltaP[x,y] = data['profit_by_gamma'][y]['median'][x]
 
 	#A 2d array of percentage increase in people/marketshare
 	deltaN = numpy.zeros((len(data['GAMMA_ARRAY']),len(data['COEFF_ARRAY_INTERNAL_COINS'])))
 	for x,v in enumerate(data['GAMMA_ARRAY']):
-	    deltaN[x,] = data['people_by_gamma'][x]['median']
-	#print deltaN
+		for y,v2 in enumerate(data['COEFF_ARRAY_INTERNAL_COINS']):
+			deltaN[x,y] = data['people_by_gamma'][y]['median'][x]
 
 	lb_vector = linspace(0,0.1,3)
 	MAX_DELTA_N = numpy.inf

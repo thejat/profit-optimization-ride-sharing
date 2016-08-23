@@ -935,8 +935,8 @@ if __name__=='__main__':
 
 	if args.data is None:
 		metadata = {'flag_nyc_data': False,
-				'COEFF_ARRAY_INTERNAL_COINS' : [100,300,600], 	
-				'GAMMA_ARRAY' 		: [.2,.6], 
+				'COEFF_ARRAY_INTERNAL_COINS' : [100,300,600], #'COEFF_ARRAY_INTERNAL_COINS': [100,200,300,400,500,600,700,800,900,1e3], # 
+				'GAMMA_ARRAY' 		: [.2,.6], # 'GAMMA_ARRAY' 		: [0.05,.1,.2,.3,.4,.5,.6,.7,.8,.9], #
 				'flag_dump_data'  	: True,
 				'no_INSTANCES'  	: 2,
 				'no_COIN_FLIPS' 	: 3,
@@ -952,8 +952,11 @@ if __name__=='__main__':
 		metadata['flag_dump_data']  = True
 		metadata['no_INSTANCES']  	= 60 if metadata['flag_nyc_data'] else 60 # else 10 #
 		metadata['no_COIN_FLIPS'] 	= 10 if metadata['flag_nyc_data'] else 10 # else 100 #
+		# metadata['no_INSTANCES']  	= 2 if metadata['flag_nyc_data'] else 60 # else 10 #
+		# metadata['no_COIN_FLIPS'] 	= 3 if metadata['flag_nyc_data'] else 10 # else 100 #
 		metadata['uniform_detour_sensitivity'] = uniform_detour_sensitivity
 		metadata['filename_pickle'] = '../../../../sharecost_ms_annex/plot_data_nyc_all60.pkl' if metadata['flag_nyc_data'] else '../../../../sharecost_ms_annex/plot_data_simulated_all60.pkl'
 		metadata['flag_multiprocessing'] = True
+
 
 	do_experiment(metadata)
