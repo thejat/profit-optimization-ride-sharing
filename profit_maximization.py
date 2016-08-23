@@ -1,4 +1,4 @@
-import random, time, math, copy, numpy, pickle, argparse, pandas, multiprocessing, networkx, pprint,collections
+import random, time, math, copy, numpy, pickle, argparse, pandas, multiprocessing, networkx, pprint,collections, scipy.stats
 __author__ = 'q4fj4lj9'
 
 def load_nyc_data(metadata):
@@ -925,13 +925,15 @@ if __name__=='__main__':
 	numpy.random.seed(5000) #needed for truncated normal. not thread-safe.
 
 	parser = argparse.ArgumentParser(description='Profit maximization using Sequential Individual Rationality')
-	parser.add_argument('-s','--sensitivity',help='Sensitivity type: unif or trnornal', required=False)
+	parser.add_argument('-s','--sensitivity',help='Sensitivity type: unif or trnormal', required=False)
 	parser.add_argument('-d','--data', help='Data value: nyc or sim',required=False)
+	parser.add_argument('-t','--test',help='Dry run if value is 1 else 0', required=False)
 	args = parser.parse_args()
 	print ("Sensitivity value: %s" % args.sensitivity )
 	print ("Data value: %s" % args.data )
+	print ("Dry run for nyc/sim: %s" % args.test)
 
-	uniform_detour_sensitivity = False if args.sensitivity=='trnornal' else True
+	uniform_detour_sensitivity = False if args.sensitivity=='trnormal' else True
 
 	if args.data is None:
 		metadata = {'flag_nyc_data': False,
@@ -950,12 +952,17 @@ if __name__=='__main__':
 		metadata['COEFF_ARRAY_INTERNAL_COINS'] = [100,200,300,400,500,600,700,800,900,1e3] # [300,400] # 	
 		metadata['GAMMA_ARRAY'] 	= [0.05,.1,.2,.3,.4,.5,.6,.7,.8,.9] # [.3,.6] # 
 		metadata['flag_dump_data']  = True
-		metadata['no_INSTANCES']  	= 60 if metadata['flag_nyc_data'] else 60 # else 10 #
-		metadata['no_COIN_FLIPS'] 	= 10 if metadata['flag_nyc_data'] else 10 # else 100 #
-		# metadata['no_INSTANCES']  	= 2 if metadata['flag_nyc_data'] else 60 # else 10 #
-		# metadata['no_COIN_FLIPS'] 	= 3 if metadata['flag_nyc_data'] else 10 # else 100 #
+		if args.test is not None and int(args.test)==0:
+			metadata['no_INSTANCES']  	= 59 if metadata['flag_nyc_data'] else 59 # else 10 #
+			metadata['no_COIN_FLIPS'] 	= 10 if metadata['flag_nyc_data'] else 10 # else 100 #
+		else:
+			metadata['no_INSTANCES']  	= 2 if metadata['flag_nyc_data'] else 2 # else 10 #
+			metadata['no_COIN_FLIPS'] 	= 3 if metadata['flag_nyc_data'] else 3 # else 100 #			
 		metadata['uniform_detour_sensitivity'] = uniform_detour_sensitivity
-		metadata['filename_pickle'] = '../../../../sharecost_ms_annex/plot_data_nyc_all60.pkl' if metadata['flag_nyc_data'] else '../../../../sharecost_ms_annex/plot_data_simulated_all60.pkl'
+		if metadata['uniform_detour_sensitivity']:
+			metadata['filename_pickle'] = '../../../../sharecost_ms_annex/plot_data_nyc_unif_all60.pkl' if metadata['flag_nyc_data'] else '../../../../sharecost_ms_annex/plot_data_simulated_unif_all60.pkl'
+		else:
+			metadata['filename_pickle'] = '../../../../sharecost_ms_annex/plot_data_nyc_trnormal_all60.pkl' if metadata['flag_nyc_data'] else '../../../../sharecost_ms_annex/plot_data_simulated_trnormal_all60.pkl'
 		metadata['flag_multiprocessing'] = True
 
 
