@@ -1,8 +1,11 @@
 import random, time, math, copy, numpy, pickle, argparse, pandas, multiprocessing, networkx, pprint,collections
 __author__ = 'q4fj4lj9'
 
-def load_nyc_data():
-	df0 = pandas.read_csv('../../../Xharecost_MS_annex/hour9.csv',usecols= ['pickup_datetime','passenger_count','pickup_longitude','pickup_latitude','dropoff_longitude','dropoff_latitude'])
+def load_nyc_data(metadata):
+	assert metadata['nyc_data_path'] is not None
+
+	df0 = pandas.read_csv(metadata['nyc_data_path'],
+		usecols= ['pickup_datetime','passenger_count','pickup_longitude','pickup_latitude','dropoff_longitude','dropoff_latitude'])
 
 	nyc_df = df0[(abs(df0.pickup_latitude-0) > 1e-5) & \
          (abs(df0.pickup_longitude-0) > 1e-5) & \
@@ -822,7 +825,7 @@ def do_experiment(metadata):
 
 	# Read NYC data from disk
 	if metadata['flag_nyc_data']==True:
-		nyc_df = load_nyc_data()
+		nyc_df = load_nyc_data(metadata)
 		assert metadata['no_INSTANCES'] < 60 #for the 0 to59 minute blocks in our NYC data.
 	else:
 		nyc_df = None
@@ -938,18 +941,19 @@ if __name__=='__main__':
 				'no_INSTANCES'  	: 2,
 				'no_COIN_FLIPS' 	: 3,
 				'uniform_detour_sensitivity' : uniform_detour_sensitivity,
-				'filename_pickle'   : '../../../Xharecost_MS_annex/plot_data_test.pkl',
+				'filename_pickle'   : '../../../../sharecost_ms_annex/plot_data_test.pkl',
 				'flag_multiprocessing': False}
 	else:
 		metadata = {}
 		metadata['flag_nyc_data'] = True if args.data=='nyc' else False
+		metadata['nyc_data_path'] = '../../../../sharecost_ms_annex/nyc_preprocess/hour9.csv'
 		metadata['COEFF_ARRAY_INTERNAL_COINS'] = [100,200,300,400,500,600,700,800,900,1e3] # [300,400] # 	
 		metadata['GAMMA_ARRAY'] 	= [0.05,.1,.2,.3,.4,.5,.6,.7,.8,.9] # [.3,.6] # 
 		metadata['flag_dump_data']  = True
 		metadata['no_INSTANCES']  	= 60 if metadata['flag_nyc_data'] else 60 # else 10 #
 		metadata['no_COIN_FLIPS'] 	= 10 if metadata['flag_nyc_data'] else 10 # else 100 #
 		metadata['uniform_detour_sensitivity'] = uniform_detour_sensitivity
-		metadata['filename_pickle'] = '../../../Xharecost_MS_annex/plot_data_nyc_all60.pkl' if metadata['flag_nyc_data'] else '../../../Xharecost_MS_annex/plot_data_simulated_all60.pkl'
+		metadata['filename_pickle'] = '../../../../sharecost_ms_annex/plot_data_nyc_all60.pkl' if metadata['flag_nyc_data'] else '../../../../sharecost_ms_annex/plot_data_simulated_all60.pkl'
 		metadata['flag_multiprocessing'] = True
 
 	do_experiment(metadata)
