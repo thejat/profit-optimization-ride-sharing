@@ -119,11 +119,11 @@ def generate_base_instance(instance_params,instance_no=0,nyc_df=None):
 		# sensitivities = [random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY']) for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
 	else:
 		# sensitivities = [instance_params['ALPHA_OP'] for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
-		temp = int(0.25*instance_params['MAX_DETOUR_SENSITIVITY'])
-		sensitivities = .5*instance_params['ALPHA_OP']+\
+		temp = .6*int(0.25*instance_params['MAX_DETOUR_SENSITIVITY'])
+		sensitivities = .3*instance_params['ALPHA_OP']+\
 						1 + rtnorm.rtnorm(-temp, 
 							temp,
-							sigma=2*temp, 
+							sigma=.5*temp, 
 							size=instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])
 
 	for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE']):
