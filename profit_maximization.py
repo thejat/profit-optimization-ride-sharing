@@ -119,8 +119,8 @@ def generate_base_instance(instance_params,instance_no=0,nyc_df=None):
 		# sensitivities = [random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY']) for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
 	else:
 		# sensitivities = [instance_params['ALPHA_OP'] for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
-		temp = int(0.5*instance_params['MAX_DETOUR_SENSITIVITY'])
-		sensitivities = instance_params['ALPHA_OP']+\
+		temp = int(0.25*instance_params['MAX_DETOUR_SENSITIVITY'])
+		sensitivities = .5*instance_params['ALPHA_OP']+\
 						1 + rtnorm.rtnorm(-temp, 
 							temp,
 							sigma=2*temp, 
@@ -813,6 +813,13 @@ def get_coin_flip_params_w_gamma(coin_flip_params,coeff_internal=100):
 		'GAMMA_OFFSET': GAMMA_OFFSET})
 	return coin_flip_params
 
+#helper detour stats
+def get_detour_stats(instance_partial):
+	output = []
+	for i in instance_partial['all_requests']:
+		output.append(instance_partial['all_requests'][i]['detour_sensitivity'])
+	return {'alpha_op': instance_partial['instance_params']['ALPHA_OP'],'sensitivities':output}
+
 #wrapper around experiment run
 def do_experiment(metadata):
 
@@ -844,6 +851,8 @@ def do_experiment(metadata):
 		instance_base = generate_base_instance(instance_params,instance_no,nyc_df) #no market assignment yet
 		coin_flip_params_wo_gamma = get_coin_flip_params_wo_gamma()
 		instance_partial = flip_coins_wo_gamma(instance_base,coin_flip_params_wo_gamma) #to keep market share and initial division in market share the same as this stochasticity need not be averaged.
+
+		detour_stats = get_detour_stats(instance_partial)
 
 		#noSIR. Hence, does not depend on probability coefficient or gamma values
 		experiment_params = {'DISCOUNT_SETTING':'detour_based','GAMMA':'no_gamma'} # 'independent'
@@ -914,7 +923,8 @@ def do_experiment(metadata):
 			'COEFF_ARRAY_INTERNAL_COINS':metadata['COEFF_ARRAY_INTERNAL_COINS'],
 			'no_COIN_FLIPS':metadata['no_COIN_FLIPS'],
 			'coin_flip_biases_array':coin_flip_biases_array,
-			'coin_flip_params_dict':coin_flip_params_dict}	
+			'coin_flip_params_dict':coin_flip_params_dict,
+			'detour_stats':detour_stats}	
 
 		if metadata['flag_dump_data']: #dump and overwrite after every instance
 			pickle.dump(data_multiple_instances,
