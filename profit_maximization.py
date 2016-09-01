@@ -765,9 +765,10 @@ def get_stats(coin_flip_no,instance):
 
 #helper
 def get_coin_flip_biases(GAMMA_ARRAY,instance):
-	coin_flip_biases = numpy.zeros((len(GAMMA_ARRAY),len(instance['all_requests'])))
+	coin_flip_biases = numpy.zeros(len(GAMMA_ARRAY))
 	for idx,gamma in enumerate(GAMMA_ARRAY):
-		coin_flip_biases[idx] = numpy.asarray([instance['all_requests'][x]['RIDE_SHARING_BIAS'][gamma] for x in instance['all_requests']])
+		coin_flip_biases[idx] = numpy.median(numpy.asarray([instance['all_requests'][x]['RIDE_SHARING_BIAS'][gamma] for x in instance['all_requests']]))
+	#print coin_flip_biases
 	return coin_flip_biases
 
 #helper: given a gamma and a realization of coin flips caused by a given coin flip param
@@ -782,10 +783,6 @@ def get_people_counts(coin_flip_no,instance,experiment_params):
 		1.0*(len(total_people) - len(initial_people))/len(initial_people))
 	# print output
 	return output
-
-#helper: probability statistics for plotting
-def get_prob_summary(coin_flip_no,instance,experiment_params):
-	return None #NotImplementedError
 
 #gets coin flip parameters related to initial market and initial ridesharers
 def get_coin_flip_params_wo_gamma():
@@ -855,7 +852,7 @@ def do_experiment(metadata):
 		#with SIR
 		profits_given_coeffs  = {} #logging purposes
 		coin_flip_params_dict = {} #logging purposes
-		coin_flip_biases_dict = {} #logging purposes
+		coin_flip_biases_array = numpy.zeros((len(metadata['COEFF_ARRAY_INTERNAL_COINS']),len(metadata['GAMMA_ARRAY']))) #logging purposes
 		for coeff_no,coeff_internal in enumerate(metadata['COEFF_ARRAY_INTERNAL_COINS']):
 
 			coin_flip_params = get_coin_flip_params_w_gamma(coin_flip_params_wo_gamma,coeff_internal)
@@ -867,7 +864,6 @@ def do_experiment(metadata):
 			people_count_dict['total_people'] 			= numpy.zeros((len(metadata['GAMMA_ARRAY']),metadata['no_COIN_FLIPS']))
 			people_count_dict['additional_people'] 		= numpy.zeros((len(metadata['GAMMA_ARRAY']),metadata['no_COIN_FLIPS']))
 			people_count_dict['additional_people_pct'] 	= numpy.zeros((len(metadata['GAMMA_ARRAY']),metadata['no_COIN_FLIPS']))
-			prob_summary_dict 							= numpy.zeros((len(metadata['GAMMA_ARRAY']),metadata['no_COIN_FLIPS'])) 
 			for coin_flip_no in range(metadata['no_COIN_FLIPS']):
 				instance = flip_coins_w_gamma(instance_partial,coin_flip_params) #only influx from internal and external changes
 				print 'Coeff {2}: Coin flip {0}: Starting corresponding experiment: Time {1}'.format(coin_flip_no,time.ctime(),coeff_internal)
@@ -879,7 +875,6 @@ def do_experiment(metadata):
 					people_count_dict['additional_people'][idx,coin_flip_no],\
 					people_count_dict['additional_people_pct'][idx,coin_flip_no]) = get_people_counts(coin_flip_no,instance,experiment_params)
 					# instance_dict[(idx,coin_flip_no)] = instance
-					prob_summary_dict[idx,coin_flip_no] = get_prob_summary(coin_flip_no,instance,experiment_params)
 					problem_instance_list.append({'coin_flip_no':coin_flip_no,
 						'instance':instance,
 						'experiment_params':experiment_params,
@@ -900,13 +895,12 @@ def do_experiment(metadata):
 			
 			#Logging
 			coin_flip_params_dict[coeff_no] = coin_flip_params #logging purposes		
-			coin_flip_biases_dict[coeff_no] = get_coin_flip_biases(metadata['GAMMA_ARRAY'],instance) #note we assume the last coin flip instance is available outside the no_COIN_FLIPS loop
+			coin_flip_biases_array[coeff_no,] = get_coin_flip_biases(metadata['GAMMA_ARRAY'],instance) #note we assume the last coin flip instance is available outside the no_COIN_FLIPS loop
 			profits_given_coeffs[coeff_no] = \
 				{'total_profit_array'	: total_profit_array,
 				 'solution_dict'		: solution_dict,
 				 'people_count_dict'	: people_count_dict,
 				 # 'instance_dict'		:instance_dict,
-				 'prob_summary_dict' 	: prob_summary_dict,
 				 'baseline_instance'	: baseline_instance,
 				 'baseline_profit'		: baseline_profit,
 				 'baseline_solution'	: baseline_solution}
@@ -917,7 +911,7 @@ def do_experiment(metadata):
 			'instance_base':instance_base,
 			'COEFF_ARRAY_INTERNAL_COINS':metadata['COEFF_ARRAY_INTERNAL_COINS'],
 			'no_COIN_FLIPS':metadata['no_COIN_FLIPS'],
-			'coin_flip_biases_dict':coin_flip_biases_dict,
+			'coin_flip_biases_array':coin_flip_biases_array,
 			'coin_flip_params_dict':coin_flip_params_dict}	
 
 		if metadata['flag_dump_data']: #dump and overwrite after every instance
@@ -947,7 +941,7 @@ if __name__=='__main__':
 
 	if args.data is None:
 		metadata = {'flag_nyc_data': False,
-				'COEFF_ARRAY_INTERNAL_COINS' : [100,600,1e3,2e3,3e3], #'COEFF_ARRAY_INTERNAL_COINS': [100,200,300,400,500,600,700,800,900,1e3], # 
+				'COEFF_ARRAY_INTERNAL_COINS' : [100,600,1e3,2e3], #'COEFF_ARRAY_INTERNAL_COINS': [100,200,300,400,500,600,700,800,900,1e3], # 
 				'GAMMA_ARRAY' 		: [.2,.6], # 'GAMMA_ARRAY' 		: [0.05,.1,.2,.3,.4,.5,.6,.7,.8,.9], #
 				'flag_dump_data'  	: True,
 				'no_INSTANCES'  	: 2,
