@@ -117,12 +117,13 @@ def generate_base_instance(instance_params,instance_no=0,nyc_df=None):
 	if instance_params['uniform_detour_sensitivity']==True:
 		sensitivities = [random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY']) for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
 	else:
-		sensitivities = [instance_params['ALPHA_OP'] for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
-		# sensitivities = instance_params['ALPHA_OP']+\
-		# 	1 + rtnorm.rtnorm(-int(0.5*instance_params['MAX_DETOUR_SENSITIVITY']), 
-		# 			int(0.5*instance_params['MAX_DETOUR_SENSITIVITY']),
-		# 			sigma=int(0.5*instance_params['MAX_DETOUR_SENSITIVITY']), 
-		# 			size=instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])
+		# sensitivities = [instance_params['ALPHA_OP'] for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
+		temp = int(0.5*instance_params['MAX_DETOUR_SENSITIVITY'])
+		sensitivities = instance_params['ALPHA_OP']+\
+						1 + rtnorm.rtnorm(-temp, 
+							temp,
+							sigma=2*temp, 
+							size=instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])
 
 	for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE']):
 		all_requests[i]['detour_sensitivity'] = sensitivities[i]
