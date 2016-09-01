@@ -115,7 +115,8 @@ def generate_base_instance(instance_params,instance_no=0,nyc_df=None):
 
 	#Generate detour sensitivities
 	if instance_params['uniform_detour_sensitivity']==True:
-		sensitivities = [random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY']) for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
+		sensitivities = [random.uniform(1,instance_params['MAX_DETOUR_SENSITIVITY']) for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
+		# sensitivities = [random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY']) for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
 	else:
 		# sensitivities = [instance_params['ALPHA_OP'] for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
 		temp = int(0.5*instance_params['MAX_DETOUR_SENSITIVITY'])
