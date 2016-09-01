@@ -1,4 +1,4 @@
-import random, time, math, copy, numpy, pickle, argparse, pandas, multiprocessing, networkx, pprint,collections, scipy.stats
+import random, time, math, copy, numpy, pickle, argparse, pandas, multiprocessing, networkx, pprint,collections, rtnorm
 __author__ = 'q4fj4lj9'
 
 def load_nyc_data(metadata):
@@ -117,8 +117,12 @@ def generate_base_instance(instance_params,instance_no=0,nyc_df=None):
 	if instance_params['uniform_detour_sensitivity']==True:
 		sensitivities = [random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY']) for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
 	else:
-		scipytn = scipy.stats.truncnorm(-2, 2,loc=instance_params['ALPHA_OP']+1, scale=int(0.25*instance_params['MAX_DETOUR_SENSITIVITY']))
-		sensitivities = scipytn.rvs(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])
+		sensitivities = [instance_params['ALPHA_OP'] for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
+		# sensitivities = instance_params['ALPHA_OP']+\
+		# 	1 + rtnorm.rtnorm(-int(0.5*instance_params['MAX_DETOUR_SENSITIVITY']), 
+		# 			int(0.5*instance_params['MAX_DETOUR_SENSITIVITY']),
+		# 			sigma=int(0.5*instance_params['MAX_DETOUR_SENSITIVITY']), 
+		# 			size=instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])
 
 	for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE']):
 		all_requests[i]['detour_sensitivity'] = sensitivities[i]
@@ -779,6 +783,10 @@ def get_people_counts(coin_flip_no,instance,experiment_params):
 	# print output
 	return output
 
+#helper: probability statistics for plotting
+def get_prob_summary(coin_flip_no,instance,experiment_params):
+	return None #NotImplementedError
+
 #gets coin flip parameters related to initial market and initial ridesharers
 def get_coin_flip_params_wo_gamma():
 	
@@ -859,6 +867,7 @@ def do_experiment(metadata):
 			people_count_dict['total_people'] 			= numpy.zeros((len(metadata['GAMMA_ARRAY']),metadata['no_COIN_FLIPS']))
 			people_count_dict['additional_people'] 		= numpy.zeros((len(metadata['GAMMA_ARRAY']),metadata['no_COIN_FLIPS']))
 			people_count_dict['additional_people_pct'] 	= numpy.zeros((len(metadata['GAMMA_ARRAY']),metadata['no_COIN_FLIPS']))
+			prob_summary_dict 							= numpy.zeros((len(metadata['GAMMA_ARRAY']),metadata['no_COIN_FLIPS'])) 
 			for coin_flip_no in range(metadata['no_COIN_FLIPS']):
 				instance = flip_coins_w_gamma(instance_partial,coin_flip_params) #only influx from internal and external changes
 				print 'Coeff {2}: Coin flip {0}: Starting corresponding experiment: Time {1}'.format(coin_flip_no,time.ctime(),coeff_internal)
@@ -870,12 +879,12 @@ def do_experiment(metadata):
 					people_count_dict['additional_people'][idx,coin_flip_no],\
 					people_count_dict['additional_people_pct'][idx,coin_flip_no]) = get_people_counts(coin_flip_no,instance,experiment_params)
 					# instance_dict[(idx,coin_flip_no)] = instance
+					prob_summary_dict[idx,coin_flip_no] = get_prob_summary(coin_flip_no,instance,experiment_params)
 					problem_instance_list.append({'coin_flip_no':coin_flip_no,
 						'instance':instance,
 						'experiment_params':experiment_params,
 						'coeff_internal':coeff_internal})
 
-				# solution_tuple_list = map(solve_instance,problem_instance_list)
 				if metadata['flag_multiprocessing'] is True:
 					pool = multiprocessing.Pool()
 					solution_tuple_list = pool.map(solve_instance,problem_instance_list)
@@ -897,9 +906,10 @@ def do_experiment(metadata):
 				 'solution_dict'		: solution_dict,
 				 'people_count_dict'	: people_count_dict,
 				 # 'instance_dict'		:instance_dict,
-				 'baseline_instance': baseline_instance,
-				 'baseline_profit': baseline_profit,
-				 'baseline_solution': baseline_solution}
+				 'prob_summary_dict' 	: prob_summary_dict,
+				 'baseline_instance'	: baseline_instance,
+				 'baseline_profit'		: baseline_profit,
+				 'baseline_solution'	: baseline_solution}
 
 		print '\n\n\n Instance {0} completed.'.format(instance_no)
 
@@ -937,7 +947,7 @@ if __name__=='__main__':
 
 	if args.data is None:
 		metadata = {'flag_nyc_data': False,
-				'COEFF_ARRAY_INTERNAL_COINS' : [100,300,600], #'COEFF_ARRAY_INTERNAL_COINS': [100,200,300,400,500,600,700,800,900,1e3], # 
+				'COEFF_ARRAY_INTERNAL_COINS' : [100,600,1e3,2e3,3e3], #'COEFF_ARRAY_INTERNAL_COINS': [100,200,300,400,500,600,700,800,900,1e3], # 
 				'GAMMA_ARRAY' 		: [.2,.6], # 'GAMMA_ARRAY' 		: [0.05,.1,.2,.3,.4,.5,.6,.7,.8,.9], #
 				'flag_dump_data'  	: True,
 				'no_INSTANCES'  	: 2,
