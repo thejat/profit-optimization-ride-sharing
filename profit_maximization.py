@@ -33,10 +33,10 @@ def get_instance_params(metadata):
 	#requests and service provider details
 	BETA1 = 0.9
 	OUR_CUT_FROM_REQUESTER_COMMON = {1:BETA1,2:0.9*BETA1} #second key:value pair is irrelevant for detour based discount
-	MAX_DETOUR_SENSITIVITY = 100
+	MAX_DETOUR_SENSITIVITY = 5
 
 	OUR_CUT_FROM_DRIVER = 0.3
-	ALPHA_OP = MAX_DETOUR_SENSITIVITY/2
+	ALPHA_OP = MAX_DETOUR_SENSITIVITY*1.0/2
 
 	#permutations needed for two participant matching
 	all_permutations_two = {('si','sj','di','dj'):'case1',
@@ -114,8 +114,9 @@ def generate_base_instance(instance_params,instance_no=0,nyc_df=None):
 
 
 	#Generate detour sensitivities
+	eps_sensitivity = 1e-5
 	if instance_params['uniform_detour_sensitivity']==True:
-		sensitivities = [random.uniform(1,instance_params['MAX_DETOUR_SENSITIVITY']) for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
+		sensitivities = [random.uniform(eps_sensitivity,instance_params['MAX_DETOUR_SENSITIVITY']) for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
 		# sensitivities = [random.randint(1,instance_params['MAX_DETOUR_SENSITIVITY']) for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
 	else:
 		# sensitivities = [instance_params['ALPHA_OP'] for i in range(instance_params['NO_OF_REQUESTS_IN_UNIVERSE'])]
@@ -791,7 +792,7 @@ def get_coin_flip_params_wo_gamma():
 	
 	PROB_PARAM_MARKET_SHARE = .6#300.0/ALPHA_OP
 
-	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA = 200
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA = 200./20
 
 	return {'PROB_PARAM_MARKET_SHARE':PROB_PARAM_MARKET_SHARE,
 	'PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA':PROB_PARAM_MARKET_SHARE_RIDE_SHARE_NO_GAMMA}
@@ -801,7 +802,7 @@ def get_coin_flip_params_w_gamma(coin_flip_params,coeff_internal=100):
 
 	assert coin_flip_params is not None
 
-	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL = coeff_internal
+	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL = coeff_internal*1.0/20
 
 	PROB_PARAM_MARKET_SHARE_RIDE_SHARE_EXTERNAL = 0.5*PROB_PARAM_MARKET_SHARE_RIDE_SHARE_INTERNAL
 
